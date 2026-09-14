@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Model weights (~46 MB): fetched by scripts/fetch_models.py, sha256-pinned.
+models/*.task
+
+# Test images: fetched by scripts/fetch_testdata.py. Not redistributed here -
+# see LICENSES.md.
+testdata/
+
+# Generated overlays from the validation run.
+reports/overlays/

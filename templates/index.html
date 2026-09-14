@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>姿态评估 Demo</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<header>
+  <h1>姿态评估 Demo</h1>
+  <p class="sub">上传一张全身照（<strong>侧面优先</strong>），叠加骨骼关键点并给出四项姿态参考读数。</p>
+  <div class="banner">
+    这是一个技术 Demo，<strong>不是医疗器械，也不提供诊断</strong>。所有阈值均为演示默认值，
+    未经任何标注数据集校准；每项指标旁都标注了该阈值的来源等级。
+  </div>
+</header>
+
+<main>
+  <section class="panel" id="upload-panel">
+    <div id="drop" class="drop">
+      <input type="file" id="file" accept="image/*" hidden>
+      <p class="drop-main">点击选择，或将照片拖到这里</p>
+      <p class="drop-sub">JPG / PNG / WebP，最大 12 MB。图片仅在内存中处理，不落盘、不外发。</p>
+    </div>
+    <div class="controls">
+      <label>模型
+        <select id="variant">
+          <option value="lite">lite（最快）</option>
+          <option value="full" selected>full（默认）</option>
+          <option value="heavy">heavy（最准，最慢）</option>
+        </select>
+      </label>
+      <label>视角
+        <select id="view">
+          <option value="" selected>自动判定</option>
+          <option value="side">强制按侧面</option>
+          <option value="front">强制按正面</option>
+        </select>
+      </label>
+      <button id="go" disabled>分析</button>
+    </div>
+    <p id="status" class="status"></p>
+  </section>
+
+  <section id="results" hidden>
+    <div id="plaus" class="reject" hidden></div>
+    <div class="grid">
+      <div class="panel">
+        <h2>关键点叠加</h2>
+        <img id="overlay" alt="骨骼关键点叠加结果">
+        <p class="legend">
+          <span class="sw bone"></span>骨架
+          <span class="sw measure"></span>测量线
+          <span class="sw plumb"></span>铅垂/水平参考线
+          <span class="sw lowvis"></span>低可见度（&lt;0.5，不参与计算）
+        </p>
+        <p id="viewinfo" class="viewinfo"></p>
+      </div>
+      <div class="panel">
+        <h2>测量结果</h2>
+        <div id="metrics"></div>
+      </div>
+    </div>
+    <details class="panel">
+      <summary>33 个关键点原始坐标（像素）</summary>
+      <div class="tablewrap"><table id="lmtable">
+        <thead><tr><th>#</th><th>名称</th><th>x</th><th>y</th><th>visibility</th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+    </details>
+  </section>
+
+  <section class="panel notes">
+    <h2>已知限制（请先读）</h2>
+    <ul>
+      <li><strong>单张照片不可标定。</strong>没有已知尺寸的参照物，所有长度只能以躯干长归一化，无法给出厘米值。</li>
+      <li><strong>相机姿态会直接污染读数。</strong>翻滚角 1:1 叠加到「高低肩」；俯仰与镜头畸变会改变「头前引角」。单张照片无法分离这些误差。</li>
+      <li><strong>「骨盆倾斜」名不副实。</strong>MediaPipe 不提供 ASIS/PSIS 关键点，真正的骨盆前后倾测不了；本页给出的是肩-髋-踝的躯干矢状面对齐。</li>
+      <li><strong>头前引与圆肩不是独立指标。</strong>二者都只用耳与肩峰两点，沿前后轴互为反号。页面另给出以踝为基准的铅垂线偏移，那组才相互独立。</li>
+      <li><strong>关键点是模型估计值。</strong>耳被头发/帽子/口罩遮挡时，MediaPipe 仍会输出一个位置，且 visibility 可能依旧很高——数值会安静地失真。</li>
+      <li><strong>阈值未经校准。</strong>标为 guess 的阈值没有任何经验依据，只用于让 Demo 产生合理的分档。</li>
+    </ul>
+  </section>
+</main>
+
+<footer>
+  模型：MediaPipe Pose Landmarker (BlazePose GHUM)，Apache-2.0。
+  未使用 YOLO-pose（AGPL-3.0）或 OpenPose（学术许可）。
+</footer>
+
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+# Pinned to what Phase 0 actually installed and validated on 2026-09-14
+# (Python 3.11.15, Ubuntu 24.04 x86_64).
+mediapipe==1.0.1
+opencv-python-headless==5.0.0.93
+flask==3.1.3
+numpy==2.4.6
+pytest==9.1.1

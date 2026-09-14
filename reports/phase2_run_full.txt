@@ -1,0 +1,176 @@
+model variant: full   images: 9
+
+==============================================================================
+business-person.png
+==============================================================================
+  image 958x1358   view=front (shoulder/torso=0.835)
+  plausibility: PASS  torso_tilt=2.5deg  head/torso=0.50
+  key landmark visibility:
+      left_ear         (  600.1,  289.4)  vis=0.997
+      right_ear        (  376.6,  291.6)  vis=0.996
+      left_shoulder    (  745.0,  640.5)  vis=0.999
+      right_shoulder   (  180.2,  616.2)  vis=0.998
+      left_hip         (  604.0, 1298.7)  vis=0.935
+      right_hip        (  262.8, 1310.6)  vis=0.933
+    ! left_ankle       (  519.8, 2402.1)  vis=0.019
+    ! right_ankle      (  202.0, 2392.9)  vis=0.025
+  metrics:
+    - Forward head angle           UNAVAILABLE  (需要侧面照。正面照下耳与肩峰几乎重叠，该角度没有意义。)
+    - Rounded shoulder offset      UNAVAILABLE  (需要侧面照。)
+    - Sagittal trunk alignment     UNAVAILABLE  (需要侧面照。)
+    - Shoulder height asymmetry       +2.47 deg     [typical]
+        左右肩峰垂直高差 24px，肩宽 565px；右肩偏高。正值=左肩较低。
+    - Plumb-line offsets           UNAVAILABLE  (需要侧面照。)
+  overlay -> reports/overlays/business-person_overlay.png
+
+==============================================================================
+hand-woman-man.jpg
+==============================================================================
+  640x317  NO POSE DETECTED  <-- pipeline failure
+
+==============================================================================
+male_full_height_hands.jpg
+==============================================================================
+  image 638x1000   view=front (shoulder/torso=0.643)
+  plausibility: PASS  torso_tilt=3.4deg  head/torso=0.50
+  key landmark visibility:
+      left_ear         (  356.2,  154.3)  vis=1.000
+      right_ear        (  300.4,  154.1)  vis=1.000
+      left_shoulder    (  406.9,  271.4)  vis=1.000
+      right_shoulder   (  255.4,  273.4)  vis=1.000
+      left_hip         (  360.2,  508.7)  vis=1.000
+      right_hip        (  274.1,  506.3)  vis=1.000
+      left_ankle       (  347.7,  823.1)  vis=0.992
+      right_ankle      (  261.1,  826.2)  vis=0.993
+  metrics:
+    - Forward head angle           UNAVAILABLE  (需要侧面照。正面照下耳与肩峰几乎重叠，该角度没有意义。)
+    - Rounded shoulder offset      UNAVAILABLE  (需要侧面照。)
+    - Sagittal trunk alignment     UNAVAILABLE  (需要侧面照。)
+    - Shoulder height asymmetry       -0.76 deg     [typical]
+        左右肩峰垂直高差 2px，肩宽 152px；左肩偏高。正值=左肩较低。
+    - Plumb-line offsets           UNAVAILABLE  (需要侧面照。)
+  overlay -> reports/overlays/male_full_height_hands_overlay.png
+
+==============================================================================
+man-woman-okay.jpg
+==============================================================================
+  image 640x426   view=front (shoulder/torso=0.581)
+  plausibility: PASS  torso_tilt=0.3deg  head/torso=0.39
+  key landmark visibility:
+      left_ear         (  230.0,  166.6)  vis=0.988
+      right_ear        (  154.8,  158.0)  vis=0.971
+      left_shoulder    (  238.0,  260.9)  vis=0.984
+      right_shoulder   (   84.9,  261.6)  vis=0.899
+    ! left_hip         (  212.3,  524.3)  vis=0.058
+    ! right_hip        (  107.8,  525.6)  vis=0.037
+    ! left_ankle       (  221.3,  916.9)  vis=0.002
+    ! right_ankle      (  138.7,  916.5)  vis=0.003
+  metrics:
+    - Forward head angle           UNAVAILABLE  (需要侧面照。正面照下耳与肩峰几乎重叠，该角度没有意义。)
+    - Rounded shoulder offset      UNAVAILABLE  (需要侧面照。)
+    - Sagittal trunk alignment     UNAVAILABLE  (需要侧面照。)
+    - Shoulder height asymmetry       -0.24 deg     [typical]
+        左右肩峰垂直高差 1px，肩宽 153px；左肩偏高。正值=左肩较低。
+    - Plumb-line offsets           UNAVAILABLE  (需要侧面照。)
+  overlay -> reports/overlays/man-woman-okay_overlay.png
+
+==============================================================================
+portrait.jpg
+==============================================================================
+  image 820x1024   view=front (shoulder/torso=0.657)
+  plausibility: PASS  torso_tilt=0.8deg  head/torso=0.44
+  key landmark visibility:
+      left_ear         (  489.8,  196.7)  vis=0.999
+      right_ear        (  320.8,  208.1)  vis=1.000
+      left_shoulder    (  596.3,  436.3)  vis=0.999
+      right_shoulder   (  225.4,  460.8)  vis=1.000
+      left_hip         (  521.5, 1020.7)  vis=0.733
+      right_hip        (  284.3, 1007.8)  vis=0.790
+    ! left_ankle       (  548.6, 1791.1)  vis=0.003
+    ! right_ankle      (  320.0, 1797.5)  vis=0.007
+  metrics:
+    - Forward head angle           UNAVAILABLE  (需要侧面照。正面照下耳与肩峰几乎重叠，该角度没有意义。)
+    - Rounded shoulder offset      UNAVAILABLE  (需要侧面照。)
+    - Sagittal trunk alignment     UNAVAILABLE  (需要侧面照。)
+    - Shoulder height asymmetry       -3.78 deg     [mild]
+        左右肩峰垂直高差 25px，肩宽 371px；左肩偏高。正值=左肩较低。
+    - Plumb-line offsets           UNAVAILABLE  (需要侧面照。)
+  overlay -> reports/overlays/portrait_overlay.png
+
+==============================================================================
+pose.jpg
+==============================================================================
+  image 1000x667   view=front (shoulder/torso=0.652)
+  plausibility: PASS  torso_tilt=1.5deg  head/torso=0.33
+  key landmark visibility:
+      left_ear         (  492.1,  277.5)  vis=1.000
+      right_ear        (  474.2,  278.0)  vis=1.000
+      left_shoulder    (  544.6,  321.4)  vis=1.000
+      right_shoulder   (  449.7,  325.0)  vis=1.000
+      left_hip         (  522.1,  471.9)  vis=0.997
+      right_hip        (  464.5,  465.9)  vis=0.999
+      left_ankle       (  701.2,  616.1)  vis=0.993
+      right_ankle      (  351.2,  607.0)  vis=0.987
+  metrics:
+    - Forward head angle           UNAVAILABLE  (需要侧面照。正面照下耳与肩峰几乎重叠，该角度没有意义。)
+    - Rounded shoulder offset      UNAVAILABLE  (需要侧面照。)
+    - Sagittal trunk alignment     UNAVAILABLE  (需要侧面照。)
+    - Shoulder height asymmetry       -2.16 deg     [typical]
+        左右肩峰垂直高差 4px，肩宽 95px；左肩偏高。正值=左肩较低。
+    - Plumb-line offsets           UNAVAILABLE  (需要侧面照。)
+  overlay -> reports/overlays/pose_overlay.png
+
+==============================================================================
+sergey.png
+==============================================================================
+  image 600x600   view=front (shoulder/torso=0.591)
+  plausibility: PASS  torso_tilt=1.8deg  head/torso=0.38
+  key landmark visibility:
+      left_ear         (  450.5,  300.4)  vis=0.995
+      right_ear        (  166.4,  293.2)  vis=0.995
+      left_shoulder    (  558.0,  622.2)  vis=0.853
+      right_shoulder   (   62.9,  614.2)  vis=0.905
+    ! left_hip         (  525.2, 1459.1)  vis=0.001
+    ! right_hip        (  147.8, 1452.5)  vis=0.001
+    ! left_ankle       (  519.5, 2687.4)  vis=0.000
+    ! right_ankle      (  172.8, 2675.3)  vis=0.000
+  metrics:
+    - Forward head angle           UNAVAILABLE  (需要侧面照。正面照下耳与肩峰几乎重叠，该角度没有意义。)
+    - Rounded shoulder offset      UNAVAILABLE  (需要侧面照。)
+    - Sagittal trunk alignment     UNAVAILABLE  (需要侧面照。)
+    - Shoulder height asymmetry       +0.93 deg     [typical]
+        左右肩峰垂直高差 8px，肩宽 495px；右肩偏高。正值=左肩较低。
+    - Plumb-line offsets           UNAVAILABLE  (需要侧面照。)
+  overlay -> reports/overlays/sergey_overlay.png
+
+==============================================================================
+test.jpg
+==============================================================================
+  image 933x1400   view=front (shoulder/torso=0.579)
+  plausibility: REJECTED  torso_tilt=61.3deg  head/torso=0.16
+      ! 躯干轴线偏离铅垂线 61°（上限 40°）。本工具的全部指标都以「直立站姿」为前提，该前提在此不成立。
+      ! 头颈段/躯干长 = 0.16，落在人体常见范围 0.22–1.1 之外，关键点很可能不是落在真实人体上。
+  key landmark visibility:
+      left_ear         (  539.3,  750.3)  vis=0.996
+      right_ear        (  584.6,  836.1)  vis=0.998
+      left_shoulder    (  534.4,  766.9)  vis=0.999
+      right_shoulder   (  622.0,  900.5)  vis=1.000
+      left_hip         (  324.3,  918.6)  vis=0.993
+      right_hip        (  347.4, 1013.6)  vis=0.998
+    ! left_ankle       (  544.3,  725.3)  vis=0.097
+      right_ankle      (  425.2,  971.5)  vis=0.677
+  metrics:
+    - Forward head angle           UNAVAILABLE  (姿态合理性检查未通过，不出数。)
+    - Rounded shoulder offset      UNAVAILABLE  (姿态合理性检查未通过，不出数。)
+    - Sagittal trunk alignment     UNAVAILABLE  (姿态合理性检查未通过，不出数。)
+    - Shoulder height asymmetry    UNAVAILABLE  (姿态合理性检查未通过，不出数。)
+    - Plumb-line offsets           UNAVAILABLE  (姿态合理性检查未通过，不出数。)
+  overlay -> reports/overlays/test_overlay.png
+
+==============================================================================
+woman_hands.jpg
+==============================================================================
+  640x960  NO POSE DETECTED  <-- pipeline failure
+
+==============================================================================
+pose detected: 7/9   no pose: 2/9
