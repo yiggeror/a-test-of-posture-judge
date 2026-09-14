@@ -23,8 +23,8 @@
 [`reports/PHASE2.md`](reports/PHASE2.md)（验证，含失败案例）。
 
 **要补齐验证缺口，见 [`reports/IMAGE_BRIEF.md`](reports/IMAGE_BRIEF.md)** ——
-可直接交给采集 agent 的图片需求书，配套自动筛图脚本
-`scripts/triage_images.py`（退出码 0 = 数据达标）。
+可直接交给采集 agent 的图片需求书。采集方无需访问本仓库；
+图片收回来后在本地跑 `scripts/triage_images.py` 筛查（退出码 0 = 数据达标）。
 
 ## 安装运行
 
@@ -98,6 +98,7 @@ scripts/setup.sh          一键安装
 scripts/fetch_models.py   下载权重并校验 sha256
 scripts/fetch_testdata.py 下载测试图
 scripts/triage_images.py  候选图自动筛查（ACCEPT/REJECT + 达标统计）
+scripts/fetch_from_manifest.py  按采集方的 sources.csv 批量下载候选图
 scripts/validate.py       阶段 2 验证脚本
 tests/test_geometry.py    21 项几何单元测试
 reports/                  阶段 0 / 阶段 2 报告
