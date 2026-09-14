@@ -233,3 +233,16 @@ def test_plausibility_rejects_bad_head_torso_proportion():
     put(p, "left_ear", 495, 480);      put(p, "right_ear", 505, 480)  # far too close
     put(p, "nose", 500, 470)
     assert not M.check_plausibility(p).ok
+
+
+def test_triage_targets_prioritise_side_views():
+    """The collection brief and the triage script must not drift apart:
+    side views are the blocking gap, so they carry the largest target."""
+    import importlib.util, pathlib
+    p = pathlib.Path(__file__).resolve().parent.parent / "scripts" / "triage_images.py"
+    spec = importlib.util.spec_from_file_location("triage", p)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    assert set(mod.TARGETS) == {"side", "front", "negative"}
+    assert mod.TARGETS["side"] > mod.TARGETS["front"] > mod.TARGETS["negative"]
+    assert mod.MIN_BODY_FRACTION > 0.5 and mod.MIN_SHORT_SIDE >= 480

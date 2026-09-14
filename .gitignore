@@ -12,3 +12,6 @@ testdata/
 
 # Generated overlays from the validation run.
 reports/overlays/
+
+# Candidate images awaiting triage (scripts/triage_images.py).
+inbox/

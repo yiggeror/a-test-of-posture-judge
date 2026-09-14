@@ -33,8 +33,13 @@ def main() -> int:
     ap.add_argument("--save-overlays", action="store_true")
     a = ap.parse_args()
 
-    files = sorted(f for f in glob.glob(os.path.join(a.dir, "*"))
-                   if f.lower().endswith((".jpg", ".jpeg", ".png", ".webp")))
+    # Recurse, so the testdata/{side,front,negative}/ layout that
+    # scripts/triage_images.py --move-accepted produces is picked up too.
+    files = sorted(
+        os.path.join(root, f)
+        for root, _, names in os.walk(a.dir)
+        for f in names
+        if f.lower().endswith((".jpg", ".jpeg", ".png", ".webp")))
     if not files:
         print(f"no images in {a.dir}/ - run scripts/fetch_testdata.py")
         return 1
@@ -43,7 +48,7 @@ def main() -> int:
     detected = failed = 0
 
     for f in files:
-        name = os.path.basename(f)
+        name = os.path.relpath(f, a.dir)
         print("=" * 78)
         print(name)
         print("=" * 78)
@@ -82,7 +87,9 @@ def main() -> int:
                     print(f"        {m.detail}")
         if a.save_overlays:
             os.makedirs("reports/overlays", exist_ok=True)
-            out = f"reports/overlays/{os.path.splitext(name)[0]}_overlay.png"
+            out = os.path.join("reports/overlays",
+                               os.path.splitext(name)[0].replace(os.sep, "_")
+                               + "_overlay.png")
             cv2.imwrite(out, render.draw(img, pts, view))
             print(f"  overlay -> {out}")
         print()
