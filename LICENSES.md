@@ -34,7 +34,13 @@ grep -ri "yolo\|ultralytics\|openpose" --include=*.py --include=*.js \
 
 ## 测试图片
 
-`testdata/` 里的图片来自 Google 公开的 `mediapipe-assets` GCS bucket
-（MediaPipe 项目自用的测试资源）。这些图片**未随本仓库分发**——
-`.gitignore` 已排除，由 `scripts/fetch_testdata.py` 现取。
-如需对外分发，请自行确认每张图片的具体授权。
+`testdata/` 下的 74 张图片**全部来自 Pexels，均为 Pexels License**
+（free to use，无需署名，允许再分发），因此随本仓库一并提交。
+逐张的原始链接、作者与授权记录在 [`testdata/sources_full.csv`](testdata/sources_full.csv)。
+
+第一轮用过的 `mediapipe-assets` 图片未随仓库分发，由
+`scripts/fetch_testdata.py` 现取。
+
+Pexels License 允许免费使用与修改，但禁止：原样售卖未经修改的照片、
+将可识别的人物用于负面或冒犯性语境、暗示照片中人物为产品代言。
+本项目仅将其用作算法验证素材，符合上述限制。

@@ -57,17 +57,21 @@ def main() -> int:
             print("  DECODE FAILED\n"); failed += 1; continue
         img = engine.read_image(open(f, "rb").read())
         h, w = img.shape[:2]
-        pts = engine.detect(img, a.variant)
-        if pts is None:
+        det = engine.detect(img, a.variant)
+        if det is None:
             print(f"  {w}x{h}  NO POSE DETECTED  <-- pipeline failure\n")
             failed += 1
             continue
         detected += 1
-        view, ratio, metrics, plaus = compute_all(pts)
-        print(f"  image {w}x{h}   view={view} (shoulder/torso={ratio:.3f})")
+        pts, world = det.pts, det.world
+        view, cue, metrics, plaus = compute_all(pts, world, (w, h), det.n_poses)
+        cue_kind = "yaw" if world else "shoulder/torso"
+        print(f"  image {w}x{h}   view={view} ({cue_kind}={cue:.2f})")
+        knee = "n/a" if plaus.knee_deg is None else f"{plaus.knee_deg:.0f}deg"
         print(f"  plausibility: {'PASS' if plaus.ok else 'REJECTED'}  "
               f"torso_tilt={plaus.torso_tilt_deg:.1f}deg  "
-              f"head/torso={plaus.head_torso_ratio:.2f}")
+              f"head/torso={plaus.head_torso_ratio:.2f}  knee={knee}  "
+              f"poses={det.n_poses}")
         for r in plaus.reasons:
             print(f"      ! {r}")
         print("  key landmark visibility:")
@@ -81,7 +85,8 @@ def main() -> int:
                 print(f"    - {m.label_en:<28} UNAVAILABLE  ({m.detail})")
             else:
                 unit = "deg" if m.unit == "deg" else "xtorso"
-                print(f"    - {m.label_en:<28} {m.value:+8.2f} {unit:<7} "
+                pm = f" +/-{m.uncertainty:.2f}" if m.uncertainty is not None else ""
+                print(f"    - {m.label_en:<28} {m.value:+8.2f}{pm} {unit:<7} "
                       f"[{m.band}]")
                 if m.detail:
                     print(f"        {m.detail}")

@@ -17,7 +17,9 @@ import numpy as np
 from mediapipe.tasks import python as mp_python
 from mediapipe.tasks.python import vision
 
-from .landmarks import Pt
+from dataclasses import dataclass
+
+from .landmarks import Pt, Pt3
 
 MODEL_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "models")
 VARIANTS = {
@@ -61,7 +63,10 @@ def get_landmarker(variant: str = "full") -> vision.PoseLandmarker:
                 base_options=mp_python.BaseOptions(
                     model_asset_path=model_path(variant)),
                 running_mode=vision.RunningMode.IMAGE,
-                num_poses=1,
+                # 2, not 1: the brief excludes photos containing more than one
+                # person, and with num_poses=1 the model silently picks one and
+                # reports on them. Detecting the second is what lets us refuse.
+                num_poses=2,
                 min_pose_detection_confidence=0.5,
                 min_pose_presence_confidence=0.5,
                 output_segmentation_masks=False,
@@ -70,10 +75,24 @@ def get_landmarker(variant: str = "full") -> vision.PoseLandmarker:
         return _cache[variant]
 
 
-def detect(bgr: np.ndarray, variant: str = "full") -> list[Pt] | None:
-    """Run pose detection, returning 33 landmarks in PIXEL coordinates.
+@dataclass
+class Detection:
+    """One detected pose.
 
-    Returns None when the model finds no pose. Never fabricates a result.
+    `pts` are image landmarks in PIXEL coordinates - what all the posture
+    geometry uses. `world` are the metric 3D landmarks, kept only so the view
+    gate can estimate body yaw; they are never used as a measurement.
+    """
+
+    pts: list[Pt]
+    world: list[Pt3] | None = None
+    n_poses: int = 1        # how many people the model found in the frame
+
+
+def detect(bgr: np.ndarray, variant: str = "full") -> Detection | None:
+    """Run pose detection. Returns None when no pose is found.
+
+    Never fabricates a result.
     """
     h, w = bgr.shape[:2]
     rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
@@ -85,12 +104,18 @@ def detect(bgr: np.ndarray, variant: str = "full") -> list[Pt] | None:
         return None
     # Scale normalised (x/width, y/height) into pixels here, once, so that no
     # downstream geometry ever sees aspect-ratio-distorted coordinates.
-    return [
+    pts = [
         Pt(lm.x * w, lm.y * h,
            float(getattr(lm, "visibility", 1.0) or 0.0),
            float(getattr(lm, "presence", 1.0) or 0.0))
         for lm in result.pose_landmarks[0]
     ]
+    world = None
+    if getattr(result, "pose_world_landmarks", None):
+        world = [Pt3(lm.x, lm.y, lm.z,
+                     float(getattr(lm, "visibility", 1.0) or 0.0))
+                 for lm in result.pose_world_landmarks[0]]
+    return Detection(pts, world, len(result.pose_landmarks))
 
 
 def read_image(data: bytes, max_side: int = 1400) -> np.ndarray | None:

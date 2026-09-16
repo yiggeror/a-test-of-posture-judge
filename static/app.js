@@ -43,10 +43,13 @@ go.addEventListener('click', async () => {
   finally{ go.disabled = false; }
 });
 
-function fmt(v, unit){
+function fmt(v, u, unit){
   if(v === null || v === undefined) return '—';
-  if(unit === 'deg') return v.toFixed(1) + '<span class="u">°</span>';
-  return v.toFixed(3) + '<span class="u">×躯干长</span>';
+  const d = unit === 'deg' ? 1 : 3;
+  const pm = (u === null || u === undefined) ? ''
+           : `<span class="pm">±${u.toFixed(d)}</span>`;
+  const sfx = unit === 'deg' ? '°' : '×躯干长';
+  return v.toFixed(d) + `<span class="u">${sfx}</span>` + pm;
 }
 
 function paint(d){
@@ -66,7 +69,9 @@ function paint(d){
   }
   $('#viewinfo').innerHTML =
     `视角判定：<strong>${d.view.label}</strong>` +
-    (d.view.forced ? '（手动指定）' : `（自动；肩宽/躯干长 = ${d.view.ratio}）`) +
+    (d.view.forced ? '（手动指定）'
+       : d.view.cue_kind === 'yaw' ? `（自动；躯干偏航 ${d.view.cue}°）`
+       : `（自动；肩宽/躯干长 = ${d.view.cue}，无 3D 关键点，回退判据）`) +
     ` · 图像 ${d.image.width}×${d.image.height}px`;
 
   $('#metrics').innerHTML = d.metrics.map(m => {
@@ -79,15 +84,19 @@ function paint(d){
     } else {
       thr = `<p class="mthresh"><span class="basis basis-guess">无阈值</span> 仅给出数值，不做判定。</p>`;
     }
+    const unc = (m.uncertainty !== null && m.uncertainty !== undefined)
+      ? `<p class="munc">± 为耳部关键点抖动 3% 躯干长所产生的摆动幅度。
+         该误差与阈值分档的间距同量级，请勿按小数位解读。</p>` : '';
     const cav = m.caveats.length
       ? `<ul class="mcav">${m.caveats.map(c=>`<li>${c}</li>`).join('')}</ul>` : '';
     return `<div class="metric">
       <div class="mhead">
         <span class="mname">${m.label}<span class="pill b-${m.band}">${BAND[m.band]}</span></span>
-        <span class="mval">${fmt(m.value, m.unit)}</span>
+        <span class="mval">${fmt(m.value, m.uncertainty, m.unit)}</span>
       </div>
       ${m.detail ? `<p class="mdetail">${m.detail}</p>` : ''}
       ${thr}
+      ${unc}
       <p class="madvice">${m.advice}</p>
       ${cav}
     </div>`;

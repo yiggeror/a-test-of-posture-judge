@@ -64,3 +64,18 @@ class Pt:
     @property
     def ok(self) -> bool:
         return self.visibility >= 0.5
+
+
+@dataclass(frozen=True)
+class Pt3:
+    """A world landmark: metric 3D, in metres, origin at the hip midpoint.
+
+    MediaPipe emits these alongside the image landmarks. The z axis is the
+    least reliable output of a single-image model, so it is used here only as a
+    coarse GATE (which view is this?), never as a measurement.
+    """
+
+    x: float
+    y: float
+    z: float
+    visibility: float

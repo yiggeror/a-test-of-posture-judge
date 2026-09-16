@@ -128,10 +128,76 @@ VIEW_RATIO_FRONT_MIN = 0.40
 
 # Angle of the shoulder-midpoint -> hip-midpoint axis away from image vertical.
 # Every metric here assumes a STANDING subject; beyond this the assumption is
-# simply void (the subject is sitting, lying, bending, or it is not a person).
-MAX_TORSO_TILT_DEG = 40.0
+# simply void (the subject is bending, lying, or it is not a person).
+#
+# Tightened from 40 after round-2 measurement: across 11 genuinely standing
+# photos the torso axis never exceeded 10.2 deg, and 40 was letting people
+# bent at the waist through - one produced "forward head -73 deg, pronounced".
+# 25 keeps more than double the observed headroom over real standing subjects.
+MAX_TORSO_TILT_DEG = 25.0
+
+# Knee angle (hip-knee-ankle), taking the more extended leg. A standing subject
+# has near-extended knees; sitting, kneeling and crouching do not.
+#
+# Measured round 2: standing 175.7-179.4 deg (n=11, including the edge cases),
+# sitting 35.2 and 81.2, kneeling 19.0. The two populations are separated by
+# roughly 90 deg, so this cut-off sits in a very wide empty gap.
+#
+# It does NOT catch bending at the waist - knees stay straight there - which is
+# what MAX_TORSO_TILT_DEG is for.
+MIN_KNEE_EXTENSION_DEG = 150.0
 
 # (ear midpoint -> shoulder midpoint) length divided by torso length.
 # Adults sit around 0.4-0.6. The hand false-positive scored 0.16.
 MIN_HEAD_TORSO_RATIO = 0.22
 MAX_HEAD_TORSO_RATIO = 1.10
+
+
+# --- View gate (body yaw) ---------------------------------------------------
+# Replaces the shoulder-width/torso-length ratio as the primary view test.
+#
+# Measured on the 12 real photos collected in round 2 (reports/PHASE3.md):
+#   true frontal      yaw =  5.2, 14.1, 15.0, 22.1, 24.1 deg
+#   rotated ~1/3 turn yaw = 53.2, 58.4 deg
+#   true lateral      yaw = 84.9, 86.4, 86.4, 87.6, 87.9 deg
+#
+# The two rotated shots are the ones the ratio test wrongly called frontal
+# (ratio 0.453 and 0.401, just over the old 0.40 cut-off), and on which it then
+# computed a shoulder-height reading that perspective had already contaminated.
+# Yaw separates them with wide margins on both sides; the ratio does not
+# separate them at all.
+#
+# Caveat: n = 12, and yaw comes from MediaPipe's world-landmark z, the least
+# reliable output of a single-image model. Used only as a coarse GATE - reject
+# the ambiguous middle - never as a measurement. The wide "oblique" band in
+# between is deliberate.
+YAW_FRONT_MAX = 30.0
+YAW_SIDE_MIN = 70.0
+
+# --- Landmark uncertainty ---------------------------------------------------
+# Perturbation budget for the reported +/- on ear-dependent metrics, as a
+# fraction of torso length (scale free, so it needs no image dimensions).
+#
+# Why this exists: on a 1400px-tall photo, displacing the ear landmark by 10px
+# swings the forward-head angle by 4.4 deg, while the gap between the "mild"
+# and "pronounced" thresholds is only 10 deg. A bare number implies a precision
+# the landmark simply does not have, so every ear-dependent reading is shown
+# with the swing this budget produces.
+#
+# 3% of torso length is roughly 10-13px on the collected photos. It is an
+# assumption about typical landmark error, NOT a measured error distribution -
+# an ear hidden under hair can be off by far more (observed: ~50px, and
+# MediaPipe still reported visibility 1.000).
+LANDMARK_JITTER_FRACTION = 0.03
+
+
+# Last-resort output bound for the shoulder-hip-ankle deviation. A standing
+# human simply cannot depart 60 deg from a straight sagittal line - at that
+# point the landmarks are not on a standing body. Observed: real standing
+# subjects -3 to -10 deg, a person bent at the waist -29, and a statue in a
+# contrapposto pose 129, which is what this catches.
+#
+# This is a sanity bound on the OUTPUT, not a posture judgement. It is a guard
+# of last resort: everything it catches should ideally have been caught by an
+# input check first.
+MAX_PLAUSIBLE_SAGITTAL_DEV_DEG = 60.0

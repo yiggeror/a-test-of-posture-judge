@@ -74,29 +74,30 @@ def analyze():
         variant = "full"
 
     try:
-        pts = engine.detect(img, variant)
+        det = engine.detect(img, variant)
     except engine.ModelMissing as e:
         return jsonify({"ok": False, "error": str(e)}), 503
     except Exception:
         traceback.print_exc()
         return jsonify({"ok": False, "error": "推理失败，详见服务端日志。"}), 500
 
-    if pts is None:
+    if det is None:
         # No pose -> no numbers. We never fall back to invented landmarks.
         return jsonify({
             "ok": False,
             "error": "未检测到人体。请使用全身入镜、光线充足、背景简单的照片。",
         }), 200
 
-    view, ratio, metrics, plaus = compute_all(pts)
+    pts, world = det.pts, det.world
+    h, w = img.shape[:2]
+    view, cue, metrics, plaus = compute_all(pts, world, (w, h), det.n_poses)
     # The view heuristic is only a heuristic, so the UI can override it.
     forced = request.form.get("view")
     if forced in ("front", "side") and plaus.ok:
         view = forced
-        metrics = compute_for_view(pts, view)
+        metrics = compute_for_view(pts, view, (w, h))
 
     overlay = render.to_png_data_uri(render.draw(img, pts, view))
-    h, w = img.shape[:2]
 
     return jsonify({
         "ok": True,
@@ -109,9 +110,14 @@ def analyze():
                               else round(plaus.torso_tilt_deg, 1),
             "head_torso_ratio": None if plaus.head_torso_ratio is None
                                 else round(plaus.head_torso_ratio, 3),
+            "knee_deg": None if plaus.knee_deg is None
+                        else round(plaus.knee_deg, 1),
+            "n_poses": det.n_poses,
             "reasons": plaus.reasons,
         },
-        "view": {"kind": view, "label": VIEW_LABEL[view], "ratio": round(ratio, 3),
+        "view": {"kind": view, "label": VIEW_LABEL[view],
+                 "cue": round(cue, 2),
+                 "cue_kind": "yaw" if world else "ratio",
                  "forced": forced in ("front", "side")},
         "landmarks": [
             {"i": i, "name": n, "x": round(p.x, 1), "y": round(p.y, 1),
@@ -121,6 +127,7 @@ def analyze():
         "metrics": [
             {"key": m.key, "label": m.label_zh, "label_en": m.label_en,
              "value": None if m.value is None else round(m.value, 2),
+             "uncertainty": None if m.uncertainty is None else round(m.uncertainty, 2),
              "unit": m.unit, "band": m.band, "detail": m.detail,
              "advice": m.advice, "caveats": m.caveats,
              "threshold": _threshold_json(m.threshold)}

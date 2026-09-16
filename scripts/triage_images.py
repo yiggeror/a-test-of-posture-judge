@@ -52,14 +52,15 @@ def grade(path: str) -> dict:
         out["reasons"].append(f"分辨率过低：短边 {min(h, w)}px < {MIN_SHORT_SIDE}px")
         return out
 
-    pts = engine.detect(img)
-    if pts is None:
+    det = engine.detect(img)
+    if det is None:
         # A no-pose image is a perfectly good NEGATIVE sample.
         out.update(accept=True, category="negative")
         out["reasons"].append("未检测到人体 —— 作为负样本收下")
         return out
 
-    plaus = check_plausibility(pts)
+    pts, world = det.pts, det.world
+    plaus = check_plausibility(pts, (w, h), det.n_poses)
     out["torso_tilt_deg"] = round(plaus.torso_tilt_deg or 0.0, 1)
     out["head_torso_ratio"] = round(plaus.head_torso_ratio or 0.0, 3)
     if not plaus.ok:
@@ -68,9 +69,10 @@ def grade(path: str) -> dict:
                               + "；".join(plaus.reasons))
         return out
 
-    view, ratio = detect_view(pts)
+    view, cue = detect_view(pts, world)
     out["view"] = view
-    out["view_ratio"] = round(ratio, 3)
+    out["view_cue"] = round(cue, 2)
+    out["view_cue_kind"] = "yaw_deg" if world else "shoulder_torso_ratio"
 
     vis = {"ear": max(pts[LEFT_EAR].visibility, pts[RIGHT_EAR].visibility),
            "shoulder": max(pts[LEFT_SHOULDER].visibility,
@@ -79,7 +81,16 @@ def grade(path: str) -> dict:
            "ankle": max(pts[LEFT_ANKLE].visibility, pts[RIGHT_ANKLE].visibility)}
     out["visibility"] = {k: round(v, 3) for k, v in vis.items()}
 
-    # Hard requirement: the whole body must be in frame.
+    # Hard requirement: the whole body must be in frame. Visibility alone does
+    # not establish this - MediaPipe extrapolates landmarks past the border and
+    # still scores them plausibly - so check the coordinates too.
+    best_ankle = max((pts[LEFT_ANKLE], pts[RIGHT_ANKLE]),
+                     key=lambda p: p.visibility)
+    if not (0 <= best_ankle.x <= w and 0 <= best_ankle.y <= h):
+        out["reasons"].append(
+            f"踝部关键点在画面外（y={best_ankle.y:.0f}，图高 {h}）—— "
+            "模型外推值，脚底没有完整入镜")
+        return out
     if vis["ankle"] < 0.5:
         out["reasons"].append(f"踝部不可见（vis={vis['ankle']:.2f}）—— 不是全身照")
         return out
@@ -102,11 +113,13 @@ def grade(path: str) -> dict:
         return out
 
     if view == "oblique":
-        out["reasons"].append(f"斜侧视角（肩宽/躯干={ratio:.2f}）—— "
+        cue_txt = (f"躯干偏航 {cue:.0f}°" if world else f"肩宽/躯干={cue:.2f}")
+        out["reasons"].append(f"斜侧视角（{cue_txt}）—— "
                               "正面与侧面指标都会被透视污染，请重拍正侧面")
         return out
 
-    computed = [m.key for m in compute_for_view(pts, view) if m.value is not None]
+    computed = [m.key for m in compute_for_view(pts, view, (w, h))
+                if m.value is not None]
     out["metrics_computed"] = computed
     if not computed:
         out["reasons"].append("该视角下无任何指标可算")

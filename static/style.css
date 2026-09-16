@@ -84,3 +84,6 @@ footer{padding:18px 20px 40px;color:var(--muted);font-size:12.5px}
 .reject ul{margin:8px 0 0;padding-left:20px}
 .reject li{margin:4px 0}
 .reject .fine{font-size:12.5px;color:var(--muted);margin:10px 0 0}
+
+.mval .pm{font-size:12px;font-weight:500;color:var(--muted);margin-left:5px}
+.munc{font-size:12.5px;color:var(--mild);margin:7px 0 0}

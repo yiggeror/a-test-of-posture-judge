@@ -1,5 +1,19 @@
 # 测试图片采集需求书（可直接作为 Cowork 提示词）
 
+> **第一轮采集实测结论（2026-09）：开放图库拿不到 P0。**
+> 采集方目视筛查约 1400 张 Pexels，P0（正侧面全身中立站姿）命中率约 **0.1%**，
+> 按此推算凑满 40 张需要筛查约 4 万张。瓶颈是「耳朵可见」叠加「手臂不遮挡躯干」——
+> 图库里的 "side view standing" 几乎全是叉腰、抱臂、扶墙、插兜、走路。
+> **负样本反而很好找（一轮拿到 62 张，质量不错）。**
+> 详见 [`PHASE3.md`](PHASE3.md)。若要再跑一轮，建议只用图库补负样本与正面照，
+> P0 侧面改用自拍或合成图。
+>
+> 另两条实测教训，已并入下方提示词：
+> - Commons 上 `Category:Human posture` 与 `Category:Full-length portrait photographs`
+>   **不存在**；正确的 `Human postures`（复数）子分类几乎全是非中立姿势。
+> - **缩略图会系统性高估合格率**：标为"强候选"的 7 张拉到全分辨率后只剩 1 张。
+>   「脚底在不在画面内」和「耳朵露没露」在 500px 缩略图上看不出来。
+
 > `---` 之间的整段可以原样复制给 Cowork / 其他采集 agent。
 > 后半部分是给人看的背景说明。
 >
@@ -77,8 +91,12 @@
   `posture side view`、`man standing profile full length`、
   `woman standing side view full body`、`standing posture lateral view`、
   `人体 侧面 站姿`。
-- Wikimedia Commons 分类：`Category:Standing`、`Category:Human posture`、
-  `Category:Full-length portrait photographs`。**请选着装正常的照片。**
+- Wikimedia Commons：**不要用 `Category:Human posture` 或
+  `Category:Full-length portrait photographs`，这两个分类不存在**；
+  `Human postures`（复数）的子分类几乎全是抱臂/鞠躬/盘腿等非中立姿势，
+  `People standing` 实际是颁奖合影，`Anthropometry` 多为殖民时期人类学测量照
+  （有伦理问题且多为裸体，不要收）。上一轮在 Commons 筛了约 350 张，P0 命中 0。
+  **建议直接从 Pexels / Unsplash / Pixabay 入手。**
 - **避免**研究专用许可的数据集（MPII、Human3.6M、3DPW 等限制转授权），
   以及任何需要签协议才能下载的数据集。
 - **不要收儿童的照片。** 在有自由授权替代品时，避免可识别身份的私人照片。
