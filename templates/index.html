@@ -148,6 +148,10 @@
           <td>
             {% if r.band %}
               <span class="band {{ r.band if r.resolved else 'unresolved' }}">{{ r.band_text }}</span>
+              {% if r.below_noise_floor %}
+                <div class="unc">这一项的测量线段太短，同样的关键点误差在此处
+                  放大成了整档宽度，因此本工具不对它下判定。</div>
+              {% endif %}
               {% if r.slight is not none %}
                 <div class="unc">阈值：{{ r.slight }}° / {{ r.notable }}°</div>
               {% endif %}

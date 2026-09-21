@@ -15,7 +15,7 @@ before believing any number it produces.
 |---|---|
 | Code | working end to end, 144 tests |
 | Frontal-plane readings (front photo) | measured precision ~1-3°, thresholds derived from a measured distribution |
-| Sagittal-plane readings (side photo) | **not trustworthy** — 29-37% of readings are off by more than a whole verdict band |
+| Sagittal-plane readings (side photo) | **not trustworthy** — 40-48% of readings are off by more than a whole verdict band |
 | Clinical validity | **none, for any metric** — no image anywhere in this project carries a clinical label |
 
 The single most useful thing this repo now contains is
@@ -110,8 +110,8 @@ These are measured or confirmed, not hypothetical.
 
 1. **Sagittal readings have a high gross-error rate.** Rotate a photo by a
    known angle and the true change in every angle is exactly that angle.
-   Under that test, 29–37% of sagittal readings are wrong by more than 5°,
-   which is the width of an entire verdict band. Frontal readings are 1–13%.
+   Under that test, 40–48% of sagittal readings are wrong by more than 5°,
+   which is the width of an entire verdict band. Frontal readings are 1–14%.
    See [`reports/RELIABILITY.md`](reports/RELIABILITY.md).
 
 2. **Thresholds for every sagittal metric are still guesses.** They are

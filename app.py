@@ -100,6 +100,7 @@ def do_assess():
             "band": v.band if v else None,
             "band_text": v.display_band_zh if v else "",
             "resolved": v.resolved if v else None,
+            "below_noise_floor": v.below_noise_floor if v else False,
             "provenance": v.spec.provenance if v else "",
             "provenance_zh": PROVENANCE_ZH.get(v.spec.provenance, "") if v else "",
             "basis": v.spec.basis if v else "",

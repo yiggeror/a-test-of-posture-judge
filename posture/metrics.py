@@ -24,19 +24,28 @@ two disagree it identifies which landmark is responsible.
 Uncertainty
 -----------
 Each angle is a two-point measurement, so a first-order propagation is exact
-enough and far more honest than a fixed number. For two endpoints each with
-isotropic positional noise sigma_px, separated by L pixels:
+enough and far more honest than a fixed number. For endpoints with positional
+noise sigma_a and sigma_b, separated by a span L pixels:
 
-    sigma_angle = sqrt(2) * sigma_px / L   (radians)
+    sigma_angle = hypot(sigma_a, sigma_b) / L   (radians)
 
-The important consequence is structural: the ear-shoulder segment is ~25 cm
-while the ankle-hip segment is ~90 cm, so identical landmark noise makes
-`forward_head` roughly 3.6x noisier than `trunk_sway`. That ratio is a
-property of the geometry and no amount of model improvement removes it.
+Two consequences, both structural rather than fixable by a better model:
 
-sigma_px is not guessed -- it is measured by scripts/repeatability.py and
-stored in reports/landmark_noise.json. Until that file exists the fallback
-below is used and is tagged as a guess.
+  * SPAN dominates. The ear-shoulder segment is ~9 cm while the ankle-hip
+    segment is ~90 cm, so identical landmark noise makes `forward_head` an
+    order of magnitude noisier than `trunk_sway`.
+
+  * The SHOULDER is the weak landmark, not the ear. Measured on this repo's
+    reference set, the ear localises to ~0.007 of body height and the
+    shoulder to ~0.021 -- three times worse. `forward_head` therefore inherits
+    most of its noise from the shoulder, over the shortest span of any metric
+    here, which is why it is the least trustworthy reading the tool produces.
+    `head_over_hip` measures the same anatomy without the shoulder and over a
+    span four times longer, and is correspondingly more precise.
+
+sigma is not guessed -- it is measured per landmark by
+scripts/repeatability.py and stored in reports/landmark_noise.json. Until that
+file exists the fallback below is used and is tagged as a guess.
 """
 from __future__ import annotations
 
@@ -76,7 +85,15 @@ class Measurement:
 
 @dataclass
 class NoiseModel:
-    """Landmark localisation noise, expressed scale-free."""
+    """Landmark localisation noise, expressed scale-free.
+
+    Per-landmark noise is used where it has been measured, because the spread
+    between landmarks is large and matters: the ear is one of the most stable
+    landmarks (~0.007 of body height) while the shoulder is around three times
+    noisier (~0.021) and the ankles noisier still. Using a single pooled
+    figure would overstate the uncertainty of head-based readings and
+    understate the shoulder's contribution.
+    """
     frac_of_body_scale: float
     provenance: str
     source: str = ""
@@ -99,15 +116,29 @@ class NoiseModel:
                    provenance="guess",
                    source="posture/metrics.py fallback constant")
 
-    def sigma_px(self, body_scale: float) -> float:
-        return self.frac_of_body_scale * body_scale
+    def sigma_px(self, body_scale: float, landmark_index: int | None = None
+                 ) -> float:
+        """Positional noise in pixels, for one landmark or pooled."""
+        frac = self.frac_of_body_scale
+        if landmark_index is not None and self.detail:
+            entry = self.detail.get(L.LANDMARK_NAMES[landmark_index])
+            if entry and "rms_frac" in entry:
+                frac = float(entry["rms_frac"])
+        return frac * body_scale
 
 
-def _angle_sigma(sigma_px: float, span_px: float) -> float:
-    """First-order angular uncertainty for a two-point angle, in degrees."""
+def _angle_sigma(sigma_a: float, sigma_b: float, span_px: float) -> float:
+    """First-order angular uncertainty for a two-point angle, in degrees.
+
+    The two endpoints contribute independently, so their positional noises add
+    in quadrature; dividing by the span converts a displacement into an angle.
+    The span is what makes this structural: identical landmark noise on a 9 cm
+    ear-shoulder segment produces several times the angular error it does on a
+    90 cm ankle-hip segment.
+    """
     if span_px <= 1e-6:
         return float("nan")
-    return math.degrees(math.sqrt(2.0) * sigma_px / span_px)
+    return math.degrees(math.hypot(sigma_a, sigma_b) / span_px)
 
 
 def compute_sagittal(pose: L.PoseResult, view: ViewEstimate,
@@ -118,9 +149,11 @@ def compute_sagittal(pose: L.PoseResult, view: ViewEstimate,
     """
     noise = noise or NoiseModel.load()
     scale = L.body_scale(pose)
-    sigma = noise.sigma_px(scale)
     side = near_side_indices(pose, view.facing)
     ant = view.facing
+
+    def sig(idx: int) -> float:
+        return noise.sigma_px(scale, idx)
 
     ear = pose.xy(side["ear"])
     sh = pose.xy(side["shoulder"])
@@ -135,7 +168,7 @@ def compute_sagittal(pose: L.PoseResult, view: ViewEstimate,
         key="forward_head",
         label="Forward head (ear relative to shoulder)",
         value=angle_from_vertical(sh, ear, anterior=ant),
-        uncertainty=_angle_sigma(sigma, span),
+        uncertainty=_angle_sigma(sig(side["shoulder"]), sig(side["ear"]), span),
         plane="sagittal", span_px=span,
         landmark_indices=(side["shoulder"], side["ear"]),
         note="Proxy for forward head posture. NOT the clinical craniovertebral "
@@ -149,7 +182,7 @@ def compute_sagittal(pose: L.PoseResult, view: ViewEstimate,
         key="shoulder_protraction",
         label="Shoulder protraction (shoulder relative to hip)",
         value=angle_from_vertical(hip, sh, anterior=ant),
-        uncertainty=_angle_sigma(sigma, span),
+        uncertainty=_angle_sigma(sig(side["hip"]), sig(side["shoulder"]), span),
         plane="sagittal", span_px=span,
         landmark_indices=(side["hip"], side["shoulder"]),
         note="Shares the shoulder landmark with forward_head, with opposite "
@@ -161,7 +194,7 @@ def compute_sagittal(pose: L.PoseResult, view: ViewEstimate,
         key="trunk_sway",
         label="Body lean (hip relative to ankle)",
         value=angle_from_vertical(ankle, hip, anterior=ant),
-        uncertainty=_angle_sigma(sigma, span),
+        uncertainty=_angle_sigma(sig(side["ankle"]), sig(side["hip"]), span),
         plane="sagittal", span_px=span,
         landmark_indices=(side["ankle"], side["hip"]),
         note="Whole-body anterior/posterior lean. The longest segment measured "
@@ -173,7 +206,7 @@ def compute_sagittal(pose: L.PoseResult, view: ViewEstimate,
         key="head_over_hip",
         label="Head over hip (shoulder-independent)",
         value=angle_from_vertical(hip, ear, anterior=ant),
-        uncertainty=_angle_sigma(sigma, span),
+        uncertainty=_angle_sigma(sig(side["hip"]), sig(side["ear"]), span),
         plane="sagittal", span_px=span,
         landmark_indices=(side["hip"], side["ear"]),
         note="Diagnostic. Does not use the shoulder landmark, so it separates "
@@ -199,7 +232,7 @@ def compute_sagittal(pose: L.PoseResult, view: ViewEstimate,
             key="knee_deviation",
             label="Knee deviation (+ flexed / - hyperextended)",
             value=knee_dev,
-            uncertainty=_angle_sigma(sigma, span) * math.sqrt(2.0),
+            uncertainty=_angle_sigma(sig(side["knee"]), sig(side["knee"]), span),
             plane="sagittal", span_px=span,
             landmark_indices=(side["hip"], side["knee"], side["ankle"]),
             note="Also used as a guard: a flexed knee means the subject was "
@@ -218,7 +251,9 @@ def compute_frontal(pose: L.PoseResult,
     """
     noise = noise or NoiseModel.load()
     scale = L.body_scale(pose)
-    sigma = noise.sigma_px(scale)
+
+    def sig(idx: int) -> float:
+        return noise.sigma_px(scale, idx)
 
     lsh, rsh = pose.xy(L.LEFT_SHOULDER), pose.xy(L.RIGHT_SHOULDER)
     lhip, rhip = pose.xy(L.LEFT_HIP), pose.xy(L.RIGHT_HIP)
@@ -231,7 +266,7 @@ def compute_frontal(pose: L.PoseResult,
         key="shoulder_tilt",
         label="Shoulder levelness",
         value=angle_from_horizontal(rsh, lsh),
-        uncertainty=_angle_sigma(sigma, span),
+        uncertainty=_angle_sigma(sig(L.RIGHT_SHOULDER), sig(L.LEFT_SHOULDER), span),
         plane="frontal", span_px=span,
         landmark_indices=(L.RIGHT_SHOULDER, L.LEFT_SHOULDER),
         note="Positive means the subject's left shoulder sits higher. Camera "
@@ -244,7 +279,7 @@ def compute_frontal(pose: L.PoseResult,
         key="pelvis_tilt",
         label="Hip levelness",
         value=angle_from_horizontal(rhip, lhip),
-        uncertainty=_angle_sigma(sigma, span),
+        uncertainty=_angle_sigma(sig(L.RIGHT_HIP), sig(L.LEFT_HIP), span),
         plane="frontal", span_px=span,
         landmark_indices=(L.RIGHT_HIP, L.LEFT_HIP),
         note="Lateral pelvic obliquity only. This is NOT anterior/posterior "
@@ -256,7 +291,7 @@ def compute_frontal(pose: L.PoseResult,
         key="head_tilt",
         label="Head tilt",
         value=angle_from_horizontal(reye, leye),
-        uncertainty=_angle_sigma(sigma, span),
+        uncertainty=_angle_sigma(sig(L.RIGHT_EYE), sig(L.LEFT_EYE), span),
         plane="frontal", span_px=span,
         landmark_indices=(L.RIGHT_EYE, L.LEFT_EYE),
         note="Measured across the eyes, a short span, so this is the noisiest "
@@ -275,7 +310,7 @@ def compute_frontal(pose: L.PoseResult,
             key="lateral_head_shift",
             label="Head lateral shift",
             value=math.degrees(math.atan2(nose[0] - sh_mid[0], span)),
-            uncertainty=_angle_sigma(sigma, span),
+            uncertainty=_angle_sigma(sig(L.NOSE), sig(L.LEFT_SHOULDER), span),
             plane="frontal", span_px=span,
             landmark_indices=(L.NOSE, L.LEFT_SHOULDER, L.RIGHT_SHOULDER),
             note="Diagnostic. Positive means the head sits to the viewer's "

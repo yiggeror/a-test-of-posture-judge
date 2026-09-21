@@ -81,14 +81,40 @@ class MetricVerdict:
     spec: ThresholdSpec
     resolved: bool           # uncertainty interval sits inside a single band
     alternative_band: str | None  # the other band it could be, when unresolved
+    below_noise_floor: bool = False
     advice_zh: list[str] = field(default_factory=list)
 
     @property
     def display_band_zh(self) -> str:
+        if self.below_noise_floor:
+            return ("测量精度不足以判定"
+                    f"（不确定度 ±{self.measurement.uncertainty:.1f}° "
+                    f"已超过「{BAND_LABELS_ZH[BAND_SLIGHT]}」整档的宽度 "
+                    f"{self.spec.notable - self.spec.slight:.1f}°）")
         if self.resolved:
             return self.band_label_zh
         other = BAND_LABELS_ZH.get(self.alternative_band or "", "")
         return f"{self.band_label_zh} / {other}（读数落在阈值的不确定度范围内，无法区分）"
+
+
+def _below_noise_floor(m: Measurement, spec: ThresholdSpec) -> bool:
+    """True when this metric cannot resolve its own middle band.
+
+    The bands are reference / slight / notable. The narrowest of them is
+    `slight`, of width (notable - slight). If the measurement uncertainty is
+    at least that wide, no reading can ever be placed in `slight` with
+    confidence -- the scale is finer than the instrument.
+
+    This is reported explicitly rather than as an undetermined two-way band,
+    because "it could be either of these" invites the reader to pick one,
+    whereas "this metric cannot be resolved at this precision" does not.
+    With the measured landmark noise this fires for `forward_head`, whose
+    +/-11 deg swamps its 8 deg middle band.
+    """
+    if m.uncertainty != m.uncertainty:  # NaN
+        return False
+    width = spec.notable - spec.slight
+    return width > 0 and m.uncertainty >= width
 
 
 @dataclass
@@ -162,10 +188,16 @@ def assess(image_rgb: np.ndarray, *, deep_guards: bool = True,
             if spec is None:
                 continue
             band, resolved, alt = _resolve_band(m, spec)
+            floored = _below_noise_floor(m, spec)
+            # No advice from a reading the instrument cannot resolve, and none
+            # from a reading that sits in the reference band.
+            advice = ([] if (floored or band == BAND_REFERENCE)
+                      else ADVICE_ZH.get(key, []))
             verdicts[key] = MetricVerdict(
                 measurement=m, band=band, band_label_zh=BAND_LABELS_ZH[band],
-                spec=spec, resolved=resolved, alternative_band=alt,
-                advice_zh=ADVICE_ZH.get(key, []) if band != BAND_REFERENCE else [])
+                spec=spec, resolved=resolved and not floored,
+                alternative_band=alt, below_noise_floor=floored,
+                advice_zh=advice)
 
     return Assessment(ok=not is_blocked, view=view, measurements=measurements,
                       verdicts=verdicts, findings=findings, blocked=is_blocked,

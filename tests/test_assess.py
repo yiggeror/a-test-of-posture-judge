@@ -65,7 +65,6 @@ class TestWording:
         # real slip: a diagnostic-only metric was once labelled
         # 「仅供诊断参考」, which reads as "for diagnostic reference".
         import os
-        import re
 
         from posture.assess import ADVICE_ZH
         from posture.thresholds import BAND_LABELS_ZH, DEFAULTS
@@ -97,3 +96,36 @@ class TestWording:
         for key in DEFAULTS:
             assert key in ADVICE_ZH, f"no advice text for {key}"
             assert ADVICE_ZH[key], key
+
+
+class TestNoiseFloor:
+    def test_uncertainty_wider_than_the_middle_band_is_unresolvable(self):
+        from posture.assess import _below_noise_floor
+        # SPEC bands are 10/20, so `slight` is 10 deg wide.
+        assert _below_noise_floor(meas(12.0, 11.0), SPEC) is True
+
+    def test_precise_measurement_is_resolvable(self):
+        from posture.assess import _below_noise_floor
+        assert _below_noise_floor(meas(12.0, 2.0), SPEC) is False
+
+    def test_nan_uncertainty_is_not_called_noise_floored(self):
+        from posture.assess import _below_noise_floor
+        assert _below_noise_floor(meas(12.0, float("nan")), SPEC) is False
+
+    def test_display_explains_rather_than_offering_two_bands(self):
+        from posture.assess import MetricVerdict
+        v = MetricVerdict(measurement=meas(12.0, 11.0), band=BAND_SLIGHT,
+                          band_label_zh="轻度倾向", spec=SPEC, resolved=False,
+                          alternative_band=BAND_NOTABLE, below_noise_floor=True)
+        text = v.display_band_zh
+        assert "测量精度不足以判定" in text
+        # It must not present a band the reader could latch onto.
+        assert "/" not in text
+
+    def test_noise_floored_metric_offers_no_advice(self):
+        from posture.assess import MetricVerdict
+        v = MetricVerdict(measurement=meas(12.0, 11.0), band=BAND_SLIGHT,
+                          band_label_zh="轻度倾向", spec=SPEC, resolved=False,
+                          alternative_band=BAND_NOTABLE, below_noise_floor=True,
+                          advice_zh=[])
+        assert v.advice_zh == []

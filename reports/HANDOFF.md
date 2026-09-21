@@ -89,8 +89,8 @@ answer, so they provide ground truth with no labelled data:
 
 `scripts/repeatability.py` runs these. Results are in
 [`RELIABILITY.md`](RELIABILITY.md); the short version is that frontal metrics
-are reliable to a few degrees and sagittal metrics have a gross-error rate
-around a third.
+are reliable to 1–3° with a 1–14% gross-error rate, while sagittal metrics
+have a 40–48% gross-error rate and are not trustworthy.
 
 ### A measurement mistake worth recording
 
@@ -113,9 +113,14 @@ track rotation. It was wrong. Two separate errors:
    **+1.0**, not −1.0. Before that fix, correct frontal behaviour
    (+0.98) looked like catastrophic failure.
 
-After both fixes, robust slopes land at −0.86..−0.98 (sagittal, expect −1.0)
-and +0.97..+1.03 (frontal, expect +1.0), and the rotation-invariant metrics
-correctly read ~0.00.
+After both fixes, robust slopes land at −0.61..−0.80 (sagittal, expect −1.0)
+and +0.98..+1.01 (frontal, expect +1.0), and the rotation-invariant metrics
+(`knee_deviation`, `head_vs_shoulder_tilt`) correctly read 0.01 and 0.00.
+
+The frontal result is the strong one: three independent metrics recovering a
+known rotation to within 2% is not something a broken measurement chain does
+by accident, so it also validates the harness itself. The sagittal shortfall
+is real and is driven by the gross-error tail, not by a scale error.
 
 Also worth keeping: **least-squares and robust slopes disagree**, and the gap
 is the finding. The typical reading tracks a known rotation well; a heavy tail
@@ -154,7 +159,7 @@ measured 80th percentile is 6.0°. The guess would have flagged most people.
 
 ### 1. Is the sagittal error rate the tool, or these images? (most important)
 
-The 29–37% gross-error rate for sagittal metrics was measured on mined COCO
+The 40–48% gross-error rate for sagittal metrics was measured on mined COCO
 photographs: 250–600px subjects, candid, often partly occluded, frequently
 mid-stride. A person deliberately photographing themselves against a plain
 wall is a substantially easier input.
