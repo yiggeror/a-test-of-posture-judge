@@ -173,11 +173,34 @@ copyright restrictions, 8 = US Government Work). Per-image provenance —
 source URL, COCO image id, license — is in `sources.csv` in each folder.
 Nothing in this repo is of unrecorded origin.
 
+Two independently collected sets, kept separate because they differ in a way
+that turned out to matter more than anything else measured here.
+
+**`testdata/pexels/`** — the previous phase's hand-curated set, carried over
+from `claude/posture-assessment-demo-q1x8nj`. Pexels License, per-image
+provenance in `testdata/pexels/sources_full.csv`. Deliberately shot studio
+photography: plain backgrounds, single subject, fitted clothing, camera level,
+subject 730–1029px shoulder-to-ankle.
+
 | folder | n | purpose |
 |---|---|---|
-| `testdata/front/` | 33 | frontal metrics |
-| `testdata/side/` | 5 | sagittal metrics |
-| `testdata/negative/` | 14 | images containing no person — regression tests for the palm/sock false-positive failures |
+| `pexels/side/` | 2 | sagittal metrics |
+| `pexels/front/` | 4 | frontal metrics |
+| `pexels/edge/` | 6 | known-hard cases: two shots at 53°/58° torso yaw that defeated the previous view test, plus lean / head-back / weight-on-one-leg |
+| `pexels/negative/` | 62 | statues, mannequins, dolls, hand and foot close-ups, bending, sitting, animals, crowds |
+
+**`testdata/{side,front,negative}/`** — mined from COCO by `coco_mine.py`,
+redistributable license ids only (4, 5, 7, 8), provenance in each folder's
+`sources.csv`. Candid photography, 250–600px subjects.
+
+| folder | n | purpose |
+|---|---|---|
+| `front/` | 33 | frontal metrics |
+| `side/` | 5 | sagittal metrics |
+| `negative/` | 14 | COCO images containing no person |
+
+The 62-image negative set is the better false-positive benchmark of the two
+and is what the guard leak rate below is measured on.
 
 The larger working set used for the primary reliability measurement includes
 NonCommercial-licensed COCO images, which are used for statistics only and are

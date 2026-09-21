@@ -191,3 +191,22 @@ class TestSubjectResolution:
         p = scale_pose(make_pose(view="front"), 0.25)
         v = estimate_view(p)
         assert G.check_subject_resolution(p, v) == []
+
+
+class TestFrontalKneeExtension:
+    def test_standing_front_view_passes(self, front_pose):
+        assert "knees_not_extended" not in keys(G.check_frontal_neutrality(front_pose))
+
+    def test_seated_front_view_blocks(self):
+        # Regression for a real leak: a seated subject in the previous phase's
+        # negative set was classified `front`, where the sagittal knee guard
+        # does not apply, and produced frontal readings unchallenged.
+        p = make_pose(view="front")
+        # Bend both knees forward out of the hip-ankle line.
+        for k_idx, h_idx in ((L.LEFT_KNEE, L.LEFT_HIP), (L.RIGHT_KNEE, L.RIGHT_HIP)):
+            lm = p.landmarks[k_idx]
+            p.landmarks[k_idx] = L.Landmark(lm.x + 260, lm.y, lm.z, 1.0, 1.0)
+        f = G.check_frontal_neutrality(p)
+        assert "knees_not_extended" in keys(f)
+        assert all(x.severity == G.SEVERITY_BLOCK for x in f
+                   if x.key == "knees_not_extended")

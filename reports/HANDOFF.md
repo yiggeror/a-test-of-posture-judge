@@ -6,15 +6,34 @@ State of the project, what changed this phase, and what is actually open.
 
 ## Situation at the start of this phase
 
-The repository contained one file: a 45-byte `README.md`. `origin/main` and
-`origin/claude/posture-assessment-reliability-2jazt2` both had a single
-commit, nothing in reflog or stash. No `app.py`, no `posture/`, no `tests/`,
-no `reports/`, no `testdata/`, no `scripts/`. The previous phase's code, its
-74 test images and its two side-view photographs were never pushed anywhere
-reachable.
+**Correction.** An earlier version of this document stated that the previous
+phase's work had never been pushed and that everything here was rebuilt from
+the handoff prose alone. That was wrong, and the error was mine.
 
-So nothing was "continued". Everything here was rebuilt from the handoff
-prose, which was the only surviving artifact.
+The previous phase's work is on **`claude/posture-assessment-demo-q1x8nj`**
+(`a26fdd0`): five commits carrying `app.py`, `posture/`, `reports/HANDOFF.md`,
+`reports/PHASE0/2/3.md`, `scripts/triage_images.py`, 74 test images and
+`testdata/sources_full.csv` — exactly what the handoff described.
+
+I missed it because I ran `git branch -a`, which lists only refs this clone
+had already fetched, and the clone had not fetched that branch. The
+authoritative check is `git ls-remote --heads origin`, and I did not run it
+until the user pushed back. **Use `git ls-remote`, not `git branch -a`, to ask
+what exists on a remote.**
+
+The rebuild still happened, because the reconstruction was largely complete
+before the branch surfaced. What changed afterwards is documented below under
+"What the previous phase's work then contributed" — it was not wasted; it
+supplied the test set that overturned this phase's headline result.
+
+### A branch-naming conflict worth knowing about
+
+The previous handoff says "所有开发和推送都在 `...-demo-q1x8nj` 这个分支上，
+不要推别的分支". This session was instructed by its own harness to develop on
+`claude/posture-assessment-reliability-2jazt2`. I followed the harness and did
+not touch the other branch. The two branches have therefore diverged from
+`7130ed2` and **nobody has merged them**. That is a decision for the repo
+owner, not something this session should have resolved unilaterally.
 
 ## What is different about this environment
 

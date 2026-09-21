@@ -10,11 +10,19 @@ transformations have a mathematically known effect on the true answer:
 
   ROTATION by theta   Every angle-from-vertical and angle-from-horizontal
                       changes by exactly theta. The posture is untouched; only
-                      the camera's idea of "down" moved. PIL rotates
-                      counter-clockwise for a positive angle, so the expected
-                      slope of (reading - baseline) against theta is -1.000.
-                      The harness checks that empirically rather than assuming
-                      it.
+                      the camera's idea of "down" moved.
+
+                      The expected slope is NOT one number. PIL rotates
+                      counter-clockwise for a positive angle, which decreases
+                      an angle measured from vertical and increases one
+                      measured from horizontal -- so frontal metrics expect
+                      +1.0 and sagittal metrics -1.0. And the sagittal sign
+                      convention is anchored to which way the subject faces
+                      (angle_from_vertical multiplies the horizontal offset by
+                      `anterior`), so a left-facing subject's sagittal reading
+                      is the negative of a right-facing one's and expects
+                      +1.0 instead. The harness normalises by facing before
+                      fitting.
 
   SCALE, JPEG, BRIGHTNESS, CONTRAST
                       The true answer does not change at all. Any movement in
@@ -24,18 +32,32 @@ transformations have a mathematically known effect on the true answer:
                       preserved, because the subject's facing direction flips
                       with them and the sign convention is anchored to facing.
 
-Two failure modes, reported separately
---------------------------------------
-An earlier version of this script pooled every comparison and produced a
-rotation slope of -0.25 where -1.00 was expected. That was not the tool
-failing to track rotation. It was the detector locking onto a DIFFERENT PERSON
-after the transform -- on a 193px-tall subject with bystanders in frame, the
-post-transform "subject" was someone else entirely, and those comparisons
-dominated the fit. With the subject correctly re-acquired, the same test gives
-a slope near -1.00.
+Three ways this measurement has already been got wrong
+------------------------------------------------------
+Each of these produced a confident number that described nothing. They are
+recorded because every one of them looked like a finding about the tool.
 
-Those are two genuinely different problems and mixing them produces a number
-that describes neither. So this script measures:
+1. POOLING A CHANGED SUBJECT. The first version reported a rotation slope of
+   -0.25 against -1.00 expected, which reads as near-total failure. It was the
+   detector locking onto a DIFFERENT PERSON after the transform -- on a 193px
+   subject with bystanders, the post-transform "subject" was someone else,
+   landmarks 1.98 body-lengths away. Fixed by mapping landmarks back through
+   the known transform and rejecting the comparison when the subject moved.
+
+2. ONE EXPECTED SLOPE FOR BOTH PLANES. Frontal metrics expect +1.0, not -1.0.
+   Before that was fixed, correct frontal behaviour (+0.98) looked like a
+   catastrophe.
+
+3. POOLING BOTH FACING DIRECTIONS. Sagittal readings for a left-facing subject
+   are the negative of a right-facing one's, so on a mixed set the two
+   populations CANCEL. This dragged the least-squares sagittal slope to -0.05
+   and inflated the apparent residuals, which was written up as a heavy
+   error tail before the cause was found. Fixed by normalising each sagittal
+   delta by the baseline facing direction.
+
+Those are genuinely different problems and mixing any of them into the
+precision statistics produces a number that describes neither. So this script
+measures:
 
   RE-ACQUISITION RATE  how often the detector finds the same subject again
                        after a transform that should not have disturbed it
@@ -262,7 +284,8 @@ def main(argv=None) -> int:
 
     counts = {"images_seen": 0, "images_used": 0, "too_small": 0,
               "no_baseline_pose": 0, "comparisons": 0,
-              "reacquired": 0, "subject_changed": 0, "no_detection": 0}
+              "reacquired": 0, "subject_changed": 0, "view_changed": 0,
+              "no_detection": 0}
 
     used = 0
     for path in files:
@@ -317,6 +340,14 @@ def main(argv=None) -> int:
             if drift > SUBJECT_IDENTITY_MAX_DRIFT:
                 counts["subject_changed"] += 1
                 continue
+
+            # The view gate and the facing direction must also be unchanged:
+            # a reading taken under a different view classification, or with
+            # the sagittal sign convention anchored the other way, is not
+            # comparable to the baseline.
+            if view.view != b_view.view or view.facing != b_view.facing:
+                counts["view_changed"] += 1
+                continue
             counts["reacquired"] += 1
 
             if theta is None:
@@ -327,9 +358,24 @@ def main(argv=None) -> int:
                     d = distance(bm(pose.xy(i)), b_pose.xy(i)) / b_scale
                     landmark_drift[L.LANDMARK_NAMES[i]].append(d)
             else:
+                # The sagittal sign convention is anchored to which way the
+                # subject faces: angle_from_vertical multiplies the horizontal
+                # offset by `anterior`, so a subject facing -x reads as the
+                # NEGATIVE of one facing +x. A rotation therefore moves the
+                # reading by -theta for a right-facing subject and by +theta
+                # for a left-facing one.
+                #
+                # Pooling both without normalising makes the two populations
+                # cancel. That is what dragged the least-squares slope to
+                # -0.05 on the mixed-facing COCO set, which was previously
+                # (wrongly) written up as a heavy error tail.
                 for k, m in metrics.items():
-                    if k in b_metrics:
-                        rot_points[k].append((theta, m.value - b_metrics[k].value))
+                    if k not in b_metrics:
+                        continue
+                    delta = m.value - b_metrics[k].value
+                    if ROTATION_EXPECTED.get(k) == -1.0:
+                        delta *= b_view.facing
+                    rot_points[k].append((theta, delta))
 
         # mirror
         got = _measure(np.ascontiguousarray(base_rgb[:, ::-1, :]), noise, args.model)
@@ -409,7 +455,8 @@ def main(argv=None) -> int:
 
     # --- print ---------------------------------------------------------------
     c = counts
-    tot = max(1, c["reacquired"] + c["subject_changed"] + c["no_detection"])
+    tot = max(1, c["reacquired"] + c["subject_changed"] + c["view_changed"]
+                + c["no_detection"])
     print(f"\n{'='*78}\nREPEATABILITY -- {used} images from {dirs_label}\n{'='*78}")
     print(f"\nSubject re-acquisition (transform should not disturb the subject):")
     print(f"  same subject found again : {c['reacquired']}/{tot} "

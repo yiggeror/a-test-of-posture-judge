@@ -101,6 +101,20 @@ MAX_WEIGHT_SHIFT_FRAC = 0.06
 # provenance: guess
 MIN_WRIST_BELOW_HIP_FRAC = -0.02
 
+# Knee extension of the STRAIGHTER leg, in a front view. The sagittal knee
+# guard uses the signed sagittal deviation and does not apply here, which left
+# front-view seated subjects completely unchecked -- a seated photo from the
+# previous phase's negative set produced frontal readings with no complaint.
+#
+# provenance: measured -- on testdata/pexels, genuine front-view standing
+# subjects measure 176.5-179.0 deg (n=4) while seated subjects measure 72.3
+# and 88.5 deg. The two populations are ~85 deg apart, so this cut sits in a
+# very wide empty gap. It matches the 150 deg the previous phase measured for
+# the sagittal case (standing 175.7-179.4, sitting 35.2/81.2, kneeling 19.0).
+# Note this does NOT separate upright statues, which measure 172-179 like
+# real standing people.
+MIN_KNEE_EXTENSION_FRONT_DEG = 150.0
+
 # Stability: landmark displacement under a small perturbation, as a fraction of
 # body scale, above which the landmark is treated as inferred rather than
 # observed. Calibrated against the measured noise floor -- see
@@ -277,6 +291,21 @@ def check_frontal_neutrality(pose: L.PoseResult) -> list[GuardFinding]:
                        "建议双脚平均受力后重拍一张对照。",
             detail={"weight_shift_frac": round(shift, 4),
                     "limit": MAX_WEIGHT_SHIFT_FRAC}))
+
+    # Knee extension, taking the STRAIGHTER leg: standing with one knee
+    # slightly soft is normal, sitting bends both.
+    from .geometry import interior_angle
+    knees = [interior_angle(pose.xy(h), pose.xy(k), pose.xy(a))
+             for h, k, a in ((L.LEFT_HIP, L.LEFT_KNEE, L.LEFT_ANKLE),
+                             (L.RIGHT_HIP, L.RIGHT_KNEE, L.RIGHT_ANKLE))]
+    knees = [a for a in knees if a == a]  # drop NaN
+    if knees and max(knees) < MIN_KNEE_EXTENSION_FRONT_DEG:
+        out.append(GuardFinding(
+            key="knees_not_extended", severity=SEVERITY_BLOCK,
+            message_zh="双膝都明显弯曲，说明人物是坐着或蹲着而不是站立，"
+                       "站姿体态的各项读数在这种情况下没有意义。",
+            detail={"straighter_knee_deg": round(max(knees), 1),
+                    "limit": MIN_KNEE_EXTENSION_FRONT_DEG}))
 
     lw, rw = pose.xy(L.LEFT_WRIST), pose.xy(L.RIGHT_WRIST)
     raised = [name for name, w, hip in
