@@ -13,15 +13,25 @@ before believing any number it produces.
 
 | | |
 |---|---|
-| Code | working end to end, 152 tests |
-| Frontal-plane readings (front photo) | measured precision ~1-3°, thresholds derived from a measured distribution |
-| Sagittal-plane readings (side photo) | **not trustworthy** — 40-48% of readings are off by more than a whole verdict band |
-| Clinical validity | **none, for any metric** — no image anywhere in this project carries a clinical label |
+| Code | working end to end, 154 tests |
+| Rotation tracking, all 9 metrics | **within 0.05 of theory** on two independent image sets |
+| Frontal readings | reliable: 1–3% gross error, thresholds from a measured distribution |
+| Sagittal readings, long-span (`head_over_hip`, `shoulder_protraction`) | reliable: 5% on candids, 0% on studio photos |
+| Sagittal readings, short-span (`forward_head`, `knee_deviation`) | **weak** — 22–25% on candids; `forward_head` cannot resolve its own thresholds |
+| False-positive guards | 6% leak on the 62-image negative set, against 29% previously |
+| Clinical validity | **none, for any metric** — no image in this project carries a clinical label |
 
-The single most useful thing this repo now contains is
+The single most useful thing this repo contains is
 [`reports/RELIABILITY.md`](reports/RELIABILITY.md), which says how far each
 reading moves when the posture does not. Those numbers were previously
 unmeasured.
+
+> **Correction.** An earlier version of this README reported a 40–48%
+> gross-error rate for the sagittal metrics and called them untrustworthy.
+> That was a bug in the measurement harness, not a property of the tool: it
+> pooled left-facing and right-facing subjects, whose sagittal readings have
+> opposite sign, so the two populations cancelled. Corrected figures are
+> above; the bug is written up in `RELIABILITY.md` section 0.
 
 ---
 
@@ -108,11 +118,12 @@ disagree it tells you which landmark is responsible.
 
 These are measured or confirmed, not hypothetical.
 
-1. **Sagittal readings have a high gross-error rate.** Rotate a photo by a
-   known angle and the true change in every angle is exactly that angle.
-   Under that test, 40–48% of sagittal readings are wrong by more than 5°,
-   which is the width of an entire verdict band. Frontal readings are 1–14%.
-   See [`reports/RELIABILITY.md`](reports/RELIABILITY.md).
+1. **Short-span metrics have a high gross-error rate.** Rotate a photo by a
+   known angle and the true change in every angle is exactly that angle. Under
+   that test, on candid photography, `forward_head` is wrong by more than 5°
+   (a whole verdict band) 22% of the time and `knee_deviation` 25%. The
+   long-span metrics are at 1–5%. On studio photography everything drops to
+   0–6%. See [`reports/RELIABILITY.md`](reports/RELIABILITY.md).
 
 2. **Thresholds for every sagittal metric are still guesses.** They are
    tagged `guess` in `posture/thresholds.py` and shown as such in the UI. The
@@ -158,10 +169,17 @@ These are measured or confirmed, not hypothetical.
    noise. `head_over_hip` measures the same anatomy without the shoulder over
    four times the span.
 
-10. **Small subjects make the sagittal readings much worse.** Restricting to
-    subjects ≥430px shoulder-to-ankle cuts sagittal gross-error rates by a
-    quarter to a half; frontal rates barely move. The app warns below that
-    size. This is measured, and the threshold is tagged accordingly.
+10. **Image quality matters more than anything else measured here.** On studio
+    photography (730–1029px subjects, plain background) every sagittal metric
+    except `forward_head` reaches a 0% gross-error rate, and landmark noise
+    halves (0.0219 → 0.0104 of body height). The app warns below 430px
+    shoulder-to-ankle. The studio figures rest on only 12 images, so read
+    "0%" as "no failures in a small sample", not as a rate.
+
+11. **Statues and mannequins are still accepted as people.** Both the pose
+    model and the independent detector call them persons because they are
+    person-shaped. They are 2 of the 4 remaining guard leaks. Geometry cannot
+    separate them and no further heuristics were attempted.
 
 ---
 

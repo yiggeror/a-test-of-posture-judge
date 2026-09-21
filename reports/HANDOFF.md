@@ -91,6 +91,44 @@ it is a matter of relaxing predicates rather than of looking at more pictures.
 
 ---
 
+## What the previous phase's work then contributed
+
+Once the missed branch surfaced, its 74-image set was merged in under
+`testdata/pexels/`. It was not redundant with the COCO set — it was the
+control the COCO set could not provide, and it changed three conclusions.
+
+**1. It exposed the facing bug.** The Pexels side views are almost all
+left-facing, so they produced a *consistently* positive rotation slope where
+−1.0 was expected, instead of the near-zero average a mixed set gives. A
+clean sign error is obvious; a cancelled average looks like noise. Without a
+single-facing set the bug would have stayed in the report.
+
+**2. It supplied the studio control.** The open question this phase left —
+"is the error rate the tool or the images?" — needed deliberately shot
+photographs, and I had written that none existed in the project. They did:
+730–1029px subjects, plain backgrounds, camera level. Measured on them,
+landmark noise halves and every sagittal metric except `forward_head` reaches
+a 0% gross-error rate.
+
+**3. Its 62-image negative set is the real false-positive benchmark.** Far
+richer than the 14 non-person COCO images I had assembled — statues,
+mannequins, dolls, hand and foot close-ups, bending, sitting, animals, crowds
+— and it comes with the previous phase's own measured leak rate (18/63, 29%),
+so the comparison is like-for-like. It also caught a guard gap: a seated
+subject classified `front`, where the sagittal knee guard does not apply, was
+measured without complaint. Fixed.
+
+It also let two of the previous phase's specific documented failures be
+re-tested rather than taken on trust:
+
+| previous phase's finding | this phase |
+|---|---|
+| ratio-based view test called two 53°/58° yaw shots "front" and produced shoulder-tilt readings on them | both classified oblique and blocked — but the margin is thin, one sits at spread 0.217 against a 0.22 threshold |
+| sock/calf close-up "passed every geometric check", output 「+32.84°，明显倾向」 | blocked by three guards |
+| hair-over-ear photo output 「头前引角 +25.39°，明显倾向」 | reads +16.5 ±11.6 → 「测量精度不足以判定」; still not *blocked*, but the harm is gone |
+
+---
+
 ## The second thing: reliability is now measured
 
 This was the stated blocker and it turned out not to require the missing side
@@ -107,15 +145,24 @@ answer, so they provide ground truth with no labelled data:
   ones.
 
 `scripts/repeatability.py` runs these. Results are in
-[`RELIABILITY.md`](RELIABILITY.md); the short version is that frontal metrics
-are reliable to 1–3° with a 1–14% gross-error rate, while sagittal metrics
-have a 40–48% gross-error rate and are not trustworthy.
+[`RELIABILITY.md`](RELIABILITY.md). Short version:
 
-### A measurement mistake worth recording
+- **All nine metrics recover a known rotation to within 0.05 of theory**, on
+  two independent image sets. The geometry and the sign conventions are right.
+- What separates them is the residual. **Span drives it**: the two
+  shortest-span metrics (`forward_head`, `knee_deviation`) sit at 22–25%
+  gross error on candid photography, the long-span ones at 1–5%.
+- **Image quality drives it too**: on studio photography everything except
+  `forward_head` reaches 0%, and landmark noise halves.
+- Guard leak rate on the previous phase's own 62-image negative set:
+  **6%, against the 29% they recorded.**
+
+### Three measurement mistakes worth recording
 
 The first version of that harness reported a rotation slope of **−0.25** where
 −1.00 was expected, which reads as the tool almost completely failing to
-track rotation. It was wrong. Two separate errors:
+track rotation. Three separate errors, each of which looked like a finding
+about the tool:
 
 1. **Pooling different failure modes.** After a transform the detector
    sometimes locked onto a *different person* in the frame — on a 193px-tall
@@ -132,18 +179,25 @@ track rotation. It was wrong. Two separate errors:
    **+1.0**, not −1.0. Before that fix, correct frontal behaviour
    (+0.98) looked like catastrophic failure.
 
-After both fixes, robust slopes land at −0.61..−0.80 (sagittal, expect −1.0)
-and +0.98..+1.01 (frontal, expect +1.0), and the rotation-invariant metrics
-(`knee_deviation`, `head_vs_shoulder_tilt`) correctly read 0.01 and 0.00.
+3. **Pooling both facing directions.** This one produced a headline that had
+   to be retracted. `angle_from_vertical` multiplies the horizontal offset by
+   `anterior`, so a **left-facing subject's sagittal reading is the negative
+   of a right-facing one's**, and a rotation moves it by **+θ instead of −θ**.
+   On a mixed-facing set the two populations cancel: the sagittal
+   least-squares slope collapsed to −0.05 and the residuals inflated. I wrote
+   that up as "sagittal metrics have a 40–48% gross-error rate and are not
+   trustworthy". It was arithmetic, not a property of the tool. After
+   normalising by facing, the same data gives −0.96..−1.01 and 5–22%.
 
-The frontal result is the strong one: three independent metrics recovering a
-known rotation to within 2% is not something a broken measurement chain does
-by accident, so it also validates the harness itself. The sagittal shortfall
-is real and is driven by the gross-error tail, not by a scale error.
+After all three fixes, every metric lands within 0.05 of its expected slope on
+both image sets. Nine metrics, two planes, two independent collections — that
+is strong evidence the geometry is right, and it validates the harness too.
 
-Also worth keeping: **least-squares and robust slopes disagree**, and the gap
-is the finding. The typical reading tracks a known rotation well; a heavy tail
-does not. Reporting only one number would describe a tool that does not exist.
+**The general lesson, and the reason this is written up at length:** on a
+harness like this, a result that looks like a dramatic failure of the system
+under test is more often a failure to hold the comparison fixed. All three
+bugs looked like findings. Two of them got written into a report before being
+caught, and one of those reports was pushed.
 
 ---
 
@@ -165,9 +219,9 @@ Current outcome:
 
 | metric | threshold source |
 |---|---|
-| `shoulder_tilt`, `pelvis_tilt`, `head_tilt`, `head_vs_shoulder_tilt` | `population-percentile`, n=87 |
-| `forward_head`, `shoulder_protraction`, `knee_deviation`, `head_over_hip` | still `guess` — n=10 |
-| `trunk_sway` | still `guess` — refused, its p90 error (25.3°) exceeds the proposed cut (7.6°) |
+| `shoulder_tilt`, `pelvis_tilt`, `head_tilt`, `head_vs_shoulder_tilt` | `population-percentile`, n=91 |
+| `forward_head`, `shoulder_protraction`, `knee_deviation`, `head_over_hip` | still `guess` — n=11 |
+| `trunk_sway` | still `guess` — refused, its p90 error (10.3°) exceeds the proposed cut (7.1°) |
 
 A concrete result: the hand-picked `shoulder_tilt` threshold was 2.0°, the
 measured 80th percentile is 6.0°. The guess would have flagged most people.
@@ -176,34 +230,31 @@ measured 80th percentile is 6.0°. The guess would have flagged most people.
 
 ## Open questions
 
-### 1. Is the sagittal error rate the tool, or these images? (most important)
+### 1. Is `forward_head` worth keeping at all?
 
-The 40–48% gross-error rate for sagittal metrics was measured on mined COCO
-photographs: 250–600px subjects, candid, often partly occluded, frequently
-mid-stride. A person deliberately photographing themselves against a plain
-wall is a substantially easier input.
+This replaces the previous open question ("is the sagittal error rate the tool
+or the images?"), which the Pexels set largely answered: **both, and the
+metric's span decides which dominates.**
 
-`RELIABILITY.md` section 6 goes some way to answering this by re-running the
-whole harness restricted to subjects ≥430px. Sagittal gross-error rates fall
-substantially (forward_head 48%→36%, head_over_hip 43%→25%,
-shoulder_protraction 40%→27%, trunk_sway 48%→32%) and robust slopes move from
-about −0.7 to −0.9, while frontal metrics move by a percentage point or less.
+On candid COCO photography `forward_head` is wrong by more than a verdict band
+22% of the time and `knee_deviation` 25%, while the long-span sagittal metrics
+sit at 5%. On studio photography everything except `forward_head` reaches 0%.
+The pattern is consistent and mechanical — `forward_head` measures the
+shortest span in the metric set (ear→shoulder, ~9 cm) using the noisiest
+landmark in it (the shoulder, ~3× the ear's noise).
 
-So: **subject size accounts for a large part of it, and that part is now
-guarded** — the app warns below 430px, with the threshold tagged `measured`.
+It already cannot resolve its own thresholds (±11.6° against 10°/18°), so the
+app refuses it a verdict. Meanwhile `head_over_hip` measures the same anatomy
+— where the head sits relative to the body — without the shoulder, over four
+times the span, at ±2.1°, with the best rotation residual of any sagittal
+metric on both sets.
 
-But it does not account for all of it. At ≥430px the sagittal rates are still
-25–36% against 1–3% frontal. Something intrinsic remains, plausibly the short
-measurement spans and the inferred far-side joints in a lateral view.
-
-The experiment still outstanding: **20–30 deliberately shot side-view
-photographs**, subject filling the frame, plain background, and re-run
-`repeatability.py`. A size stratification of candid photos suggests a
-direction but cannot predict where the rate lands for a photo taken on
-purpose. If it drops to frontal levels, the sagittal metrics are usable behind
-an input-quality gate. If it plateaus near 25%, they need redesign — and
-section 5 says how: `head_over_hip` (±2.1°) rather than `forward_head`
-(±11.6°).
+**The open call: promote `head_over_hip` from diagnostic to the primary
+forward-head reading, and either retire `forward_head` or keep it only as a
+diagnostic.** I did not make that change unilaterally because "头前引角" is
+the metric the product promises and renaming it is a product decision. But
+the measurement says the tool currently leads with its worst reading and
+hides its best one.
 
 ### 2. Side-view data is still short
 

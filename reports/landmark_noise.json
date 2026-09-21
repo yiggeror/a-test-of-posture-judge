@@ -1,172 +1,172 @@
 {
-  "frac_of_body_scale": 0.02572,
+  "frac_of_body_scale": 0.0219,
   "provenance": "measured",
-  "source": "scripts/repeatability.py, 130 images from /tmp/claude-0/-home-user-a-test-of-posture-judge/eaae9567-a508-594b-a9ed-53ca8d10fc17/scratchpad/ref/side, /tmp/claude-0/-home-user-a-test-of-posture-judge/eaae9567-a508-594b-a9ed-53ca8d10fc17/scratchpad/ref/front, 2387 re-acquired comparisons under JPEG/scale/brightness/contrast",
+  "source": "scripts/repeatability.py, 130 images from /tmp/claude-0/-home-user-a-test-of-posture-judge/eaae9567-a508-594b-a9ed-53ca8d10fc17/scratchpad/ref/side, /tmp/claude-0/-home-user-a-test-of-posture-judge/eaae9567-a508-594b-a9ed-53ca8d10fc17/scratchpad/ref/front, 2075 re-acquired comparisons under JPEG/scale/brightness/contrast",
   "per_landmark": {
     "nose": {
-      "n": 1397,
-      "rms_frac": 0.00901,
-      "p95_frac": 0.01586
+      "n": 1240,
+      "rms_frac": 0.00795,
+      "p95_frac": 0.01404
     },
     "left_eye_inner": {
-      "n": 1397,
-      "rms_frac": 0.00876,
-      "p95_frac": 0.01528
+      "n": 1240,
+      "rms_frac": 0.00783,
+      "p95_frac": 0.01393
     },
     "left_eye": {
-      "n": 1397,
-      "rms_frac": 0.00886,
-      "p95_frac": 0.01561
+      "n": 1240,
+      "rms_frac": 0.00782,
+      "p95_frac": 0.01417
     },
     "left_eye_outer": {
-      "n": 1397,
-      "rms_frac": 0.00903,
-      "p95_frac": 0.016
+      "n": 1240,
+      "rms_frac": 0.00788,
+      "p95_frac": 0.01515
     },
     "right_eye_inner": {
-      "n": 1397,
-      "rms_frac": 0.00854,
-      "p95_frac": 0.01418
+      "n": 1240,
+      "rms_frac": 0.00761,
+      "p95_frac": 0.01297
     },
     "right_eye": {
-      "n": 1397,
-      "rms_frac": 0.00884,
-      "p95_frac": 0.0146
+      "n": 1240,
+      "rms_frac": 0.00771,
+      "p95_frac": 0.01298
     },
     "right_eye_outer": {
-      "n": 1397,
-      "rms_frac": 0.00904,
-      "p95_frac": 0.01566
+      "n": 1240,
+      "rms_frac": 0.00754,
+      "p95_frac": 0.01303
     },
     "left_ear": {
-      "n": 1397,
-      "rms_frac": 0.00906,
-      "p95_frac": 0.01496
+      "n": 1240,
+      "rms_frac": 0.00673,
+      "p95_frac": 0.01192
     },
     "right_ear": {
-      "n": 1397,
-      "rms_frac": 0.01005,
-      "p95_frac": 0.01492
+      "n": 1240,
+      "rms_frac": 0.00688,
+      "p95_frac": 0.01182
     },
     "mouth_left": {
-      "n": 1397,
-      "rms_frac": 0.00812,
-      "p95_frac": 0.01519
+      "n": 1240,
+      "rms_frac": 0.00711,
+      "p95_frac": 0.01286
     },
     "mouth_right": {
-      "n": 1397,
-      "rms_frac": 0.00871,
-      "p95_frac": 0.01456
+      "n": 1240,
+      "rms_frac": 0.00713,
+      "p95_frac": 0.01286
     },
     "left_shoulder": {
-      "n": 1397,
-      "rms_frac": 0.02318,
-      "p95_frac": 0.01861
+      "n": 1240,
+      "rms_frac": 0.01324,
+      "p95_frac": 0.0142
     },
     "right_shoulder": {
-      "n": 1397,
-      "rms_frac": 0.02276,
-      "p95_frac": 0.0211
+      "n": 1240,
+      "rms_frac": 0.01366,
+      "p95_frac": 0.01329
     },
     "left_elbow": {
-      "n": 1397,
-      "rms_frac": 0.03383,
-      "p95_frac": 0.03494
+      "n": 1240,
+      "rms_frac": 0.01876,
+      "p95_frac": 0.02608
     },
     "right_elbow": {
-      "n": 1397,
-      "rms_frac": 0.03732,
-      "p95_frac": 0.06894
+      "n": 1240,
+      "rms_frac": 0.02331,
+      "p95_frac": 0.04021
     },
     "left_wrist": {
-      "n": 1397,
-      "rms_frac": 0.04746,
-      "p95_frac": 0.08097
+      "n": 1240,
+      "rms_frac": 0.03663,
+      "p95_frac": 0.06732
     },
     "right_wrist": {
-      "n": 1397,
-      "rms_frac": 0.05713,
-      "p95_frac": 0.07935
+      "n": 1240,
+      "rms_frac": 0.04588,
+      "p95_frac": 0.06044
     },
     "left_pinky": {
-      "n": 1397,
-      "rms_frac": 0.05353,
-      "p95_frac": 0.09344
+      "n": 1240,
+      "rms_frac": 0.0431,
+      "p95_frac": 0.07862
     },
     "right_pinky": {
-      "n": 1397,
-      "rms_frac": 0.06625,
-      "p95_frac": 0.09644
+      "n": 1240,
+      "rms_frac": 0.05433,
+      "p95_frac": 0.07091
     },
     "left_index": {
-      "n": 1397,
-      "rms_frac": 0.05459,
-      "p95_frac": 0.10012
+      "n": 1240,
+      "rms_frac": 0.04478,
+      "p95_frac": 0.08499
     },
     "right_index": {
-      "n": 1397,
-      "rms_frac": 0.06717,
-      "p95_frac": 0.09078
+      "n": 1240,
+      "rms_frac": 0.05567,
+      "p95_frac": 0.07024
     },
     "left_thumb": {
-      "n": 1397,
-      "rms_frac": 0.05218,
-      "p95_frac": 0.09011
+      "n": 1240,
+      "rms_frac": 0.0434,
+      "p95_frac": 0.07734
     },
     "right_thumb": {
-      "n": 1397,
-      "rms_frac": 0.0629,
-      "p95_frac": 0.08658
+      "n": 1240,
+      "rms_frac": 0.05218,
+      "p95_frac": 0.06712
     },
     "left_hip": {
-      "n": 1397,
-      "rms_frac": 0.01638,
-      "p95_frac": 0.02551
+      "n": 1240,
+      "rms_frac": 0.01203,
+      "p95_frac": 0.02291
     },
     "right_hip": {
-      "n": 1397,
-      "rms_frac": 0.01722,
-      "p95_frac": 0.02499
+      "n": 1240,
+      "rms_frac": 0.01179,
+      "p95_frac": 0.02144
     },
     "left_knee": {
-      "n": 1397,
-      "rms_frac": 0.02465,
-      "p95_frac": 0.04888
+      "n": 1240,
+      "rms_frac": 0.02276,
+      "p95_frac": 0.0408
     },
     "right_knee": {
-      "n": 1397,
-      "rms_frac": 0.02895,
-      "p95_frac": 0.04939
+      "n": 1240,
+      "rms_frac": 0.02257,
+      "p95_frac": 0.04059
     },
     "left_ankle": {
-      "n": 1397,
-      "rms_frac": 0.03849,
-      "p95_frac": 0.06818
+      "n": 1240,
+      "rms_frac": 0.03703,
+      "p95_frac": 0.06023
     },
     "right_ankle": {
-      "n": 1397,
-      "rms_frac": 0.04479,
-      "p95_frac": 0.07166
+      "n": 1240,
+      "rms_frac": 0.04154,
+      "p95_frac": 0.05743
     },
     "left_heel": {
-      "n": 1397,
-      "rms_frac": 0.04112,
-      "p95_frac": 0.07396
+      "n": 1240,
+      "rms_frac": 0.03974,
+      "p95_frac": 0.05937
     },
     "right_heel": {
-      "n": 1397,
-      "rms_frac": 0.04826,
-      "p95_frac": 0.07994
+      "n": 1240,
+      "rms_frac": 0.04428,
+      "p95_frac": 0.06563
     },
     "left_foot_index": {
-      "n": 1397,
-      "rms_frac": 0.04062,
-      "p95_frac": 0.07131
+      "n": 1240,
+      "rms_frac": 0.03879,
+      "p95_frac": 0.06113
     },
     "right_foot_index": {
-      "n": 1397,
-      "rms_frac": 0.04795,
-      "p95_frac": 0.07867
+      "n": 1240,
+      "rms_frac": 0.04488,
+      "p95_frac": 0.06692
     }
   }
 }
