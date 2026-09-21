@@ -1,0 +1,15 @@
+file_name,coco_image_id,split,source_url,license_id,license_name,redistributable,view_guess,bytes,status
+coco_116479.jpg,116479,val2017,http://farm9.staticflickr.com/8463/8142492504_fc66c0ba1f_b.jpg,4,CC BY 2.0,yes,nonperson_bed,144830,ok
+coco_241326.jpg,241326,val2017,http://images.cocodataset.org/val2017/000000241326.jpg,5,CC BY-SA 2.0,yes,nonperson_couch,128338,ok
+coco_540928.jpg,540928,val2017,http://farm4.staticflickr.com/3591/3373335806_30482ab023_b.jpg,4,CC BY 2.0,yes,nonperson_chair,96341,ok
+coco_271728.jpg,271728,val2017,http://farm9.staticflickr.com/8068/8152724397_82f0c4fc97_b.jpg,5,CC BY-SA 2.0,yes,nonperson_couch,135316,ok
+coco_222317.jpg,222317,val2017,http://farm4.staticflickr.com/3009/3098419724_89827f6fd7_b.jpg,5,CC BY-SA 2.0,yes,nonperson_couch,142009,ok
+coco_347930.jpg,347930,val2017,http://farm5.staticflickr.com/4049/4377071026_9646c57fb7_b.jpg,4,CC BY 2.0,yes,nonperson_couch,191895,ok
+coco_486479.jpg,486479,val2017,http://farm4.staticflickr.com/3563/3792891749_6efb555740_b.jpg,4,CC BY 2.0,yes,nonperson_bed,148376,ok
+coco_389933.jpg,389933,val2017,http://farm5.staticflickr.com/4061/4376326145_7ef66603e3_b.jpg,4,CC BY 2.0,yes,nonperson_couch,230787,ok
+coco_236784.jpg,236784,val2017,http://farm3.staticflickr.com/2380/2222474135_825753ebbd_b.jpg,4,CC BY 2.0,yes,nonperson_couch,265630,ok
+coco_338901.jpg,338901,val2017,http://farm4.staticflickr.com/3220/3098425884_0dfc6b86d5_b.jpg,5,CC BY-SA 2.0,yes,nonperson_couch,169513,ok
+coco_80949.jpg,80949,val2017,http://farm3.staticflickr.com/2221/2232846153_5eee9c75fc_b.jpg,5,CC BY-SA 2.0,yes,nonperson_laptop,114971,ok
+coco_222299.jpg,222299,val2017,http://farm4.staticflickr.com/3270/2569402304_5459e6c3c1_b.jpg,4,CC BY 2.0,yes,nonperson_bed,158539,ok
+coco_39769.jpg,39769,val2017,http://farm1.staticflickr.com/60/210383891_f91a89fd5e_b.jpg,5,CC BY-SA 2.0,yes,nonperson_bed,303763,ok
+coco_113403.jpg,113403,val2017,http://farm3.staticflickr.com/2613/3713015524_bac439d1e6_b.jpg,4,CC BY 2.0,yes,nonperson_bed,216915,ok

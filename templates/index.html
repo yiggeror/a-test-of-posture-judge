@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>体态参考读数</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --card:#fff; --ink:#1c2128; --muted:#5b6673; --line:#e3e6ea;
+    --ok:#1f8a4c; --slight:#b8860b; --notable:#c0392b; --block:#8b1a1a;
+    --accent:#2563eb;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans CJK SC","PingFang SC","Microsoft YaHei",sans-serif}
+  .wrap{max-width:940px;margin:0 auto;padding:28px 16px 80px}
+  h1{font-size:24px;margin:0 0 6px}
+  .sub{color:var(--muted);font-size:14px;margin-bottom:22px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;
+        padding:20px;margin-bottom:18px}
+  .disclaimer{background:#fff8e6;border-color:#f0dcae;font-size:14px;color:#6b5312}
+  form{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  input[type=file]{flex:1;min-width:220px}
+  button{background:var(--accent);color:#fff;border:0;border-radius:7px;
+         padding:10px 22px;font-size:15px;cursor:pointer}
+  button:hover{background:#1d4ed8}
+  .err{background:#fdeaea;border-color:#f3c0c0;color:#8b1a1a}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:720px){.grid{grid-template-columns:1fr}}
+  img.shot{width:100%;border-radius:8px;border:1px solid var(--line);display:block}
+  .kv{display:flex;gap:10px;flex-wrap:wrap;font-size:14px;color:var(--muted);
+      margin-top:10px}
+  .kv span{background:#eef1f5;border-radius:5px;padding:3px 9px}
+  table{width:100%;border-collapse:collapse;margin-top:6px}
+  th,td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--line);
+        vertical-align:top;font-size:15px}
+  th{font-size:13px;color:var(--muted);font-weight:600}
+  .num{font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:600}
+  .unc{color:var(--muted);font-weight:400;font-size:13px}
+  .band{font-weight:600;font-size:14px}
+  .band.reference{color:var(--ok)} .band.slight{color:var(--slight)}
+  .band.notable{color:var(--notable)}
+  .band.unresolved{color:var(--muted);font-weight:500}
+  .prov{font-size:12px;border-radius:4px;padding:2px 7px;white-space:nowrap}
+  .prov.guess{background:#fdeaea;color:#8b1a1a}
+  .prov.population-percentile{background:#e8f5ec;color:#1f8a4c}
+  .prov.geometric-estimate{background:#eef1f5;color:#44506080}
+  .prov.literature-adjacent{background:#fff4e0;color:#8a6116}
+  details{margin-top:6px}
+  summary{cursor:pointer;font-size:13px;color:var(--accent)}
+  .basis{font-size:13px;color:var(--muted);margin-top:6px;
+         border-left:3px solid var(--line);padding-left:10px}
+  .finding{border-radius:8px;padding:12px 14px;margin-bottom:10px;font-size:14px}
+  .finding.block{background:#fdeaea;border:1px solid #f3c0c0;color:var(--block)}
+  .finding.warn{background:#fff8e6;border:1px solid #f0dcae;color:#6b5312}
+  .finding code{font-size:12px;opacity:.75}
+  .advice{margin:8px 0 0;padding-left:20px;font-size:14px;color:var(--muted)}
+  .advice li{margin:3px 0}
+  h2{font-size:17px;margin:26px 0 10px}
+  .diag{background:#fafbfc}
+  .foot{font-size:12.5px;color:var(--muted);margin-top:26px;line-height:1.7}
+  .metric-img{width:150px;border-radius:6px;border:1px solid var(--line)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>体态参考读数</h1>
+  <div class="sub">上传一张全身照，得到基于关键点几何的参考读数。不是医学诊断。</div>
+
+  <div class="card disclaimer">{{ disclaimer }}</div>
+
+  <div class="card">
+    <form action="/assess" method="post" enctype="multipart/form-data">
+      <input type="file" name="photo" accept="image/*" required>
+      <button type="submit">开始分析</button>
+    </form>
+    <div class="kv" style="margin-top:14px">
+      <span>正面照 → 高低肩 / 骨盆侧倾 / 头部侧倾</span>
+      <span>侧面照 → 头前引 / 圆肩 / 躯干前后倾 / 膝关节</span>
+      <span>需要完整全身、双脚在画面内</span>
+      <span>手臂自然垂放</span>
+    </div>
+  </div>
+
+  {% if error %}<div class="card err">{{ error }}</div>{% endif %}
+
+  {% if result %}
+    {% if result.error %}
+      <div class="card err">{{ result.error }}</div>
+    {% endif %}
+
+    {% if result.blocks %}
+      <h2>无法给出判定</h2>
+      {% for f in result.blocks %}
+        <div class="finding block">{{ f.message_zh }}<br><code>{{ f.key }} · {{ f.detail }}</code></div>
+      {% endfor %}
+    {% endif %}
+
+    {% if result.warns %}
+      <h2>需要注意</h2>
+      {% for f in result.warns %}
+        <div class="finding warn">{{ f.message_zh }}<br><code>{{ f.key }}</code></div>
+      {% endfor %}
+    {% endif %}
+
+    {% if result.overlay %}
+    <div class="card">
+      <div class="grid">
+        <div><img class="shot" src="{{ result.overlay }}" alt="骨架叠加"></div>
+        <div>
+          <strong>检测结果</strong>
+          <div class="kv">
+            <span>视角：{{ {'front':'正面','side':'侧面','oblique':'斜侧'}.get(result.view.view, result.view.view) }}</span>
+            <span>躯干偏航角：{{ '%.0f'|format(result.view.yaw_deg) }}°</span>
+            <span>朝向置信度：{{ '%.2f'|format(result.view.facing_confidence) }}</span>
+          </div>
+          <div class="basis" style="margin-top:12px">
+            空心红点表示：图像被轻微缩放后该关键点位置明显移动，
+            说明模型是在推测而不是看到它。依赖这些点的读数请谨慎参考。
+          </div>
+          <div class="basis">
+            关键点定位噪声：{{ '%.4f'|format(result.noise.frac_of_body_scale) }}
+            （占身高比例，来源：{{ result.noise.provenance }}）。
+            下方每项读数的 ± 由该噪声沿测量线段传播得出，
+            线段越短的指标（如耳—肩）不确定度越大。
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if result.rows %}
+    <div class="card">
+      <h2 style="margin-top:0">读数</h2>
+      <table>
+        <tr><th>指标</th><th>读数</th><th>倾向（仅供参考）</th><th>阈值来源</th></tr>
+        {% for r in result.rows %}
+        <tr class="{{ 'diag' if r.diagnostic }}">
+          <td>
+            <strong>{{ r.label_zh if not r.diagnostic else r.key }}</strong>
+            {% if r.diagnostic %}<span class="unc">（辅助参考项，不做判定）</span>{% endif %}
+            <details><summary>这项是怎么测的</summary>
+              <div class="basis">{{ r.note }}</div>
+            </details>
+            {% if r.image %}<img class="metric-img" src="{{ r.image }}" style="margin-top:8px">{% endif %}
+          </td>
+          <td class="num">{{ r.value }}°<br><span class="unc">± {{ r.uncertainty }}°</span></td>
+          <td>
+            {% if r.band %}
+              <span class="band {{ r.band if r.resolved else 'unresolved' }}">{{ r.band_text }}</span>
+              {% if r.slight is not none %}
+                <div class="unc">阈值：{{ r.slight }}° / {{ r.notable }}°</div>
+              {% endif %}
+              {% if r.advice %}
+              <ul class="advice">{% for a in r.advice %}<li>{{ a }}</li>{% endfor %}</ul>
+              {% endif %}
+            {% else %}<span class="unc">—</span>{% endif %}
+          </td>
+          <td>
+            {% if r.provenance %}
+              <span class="prov {{ r.provenance }}">{{ r.provenance_zh }}</span>
+              <details><summary>依据</summary><div class="basis">{{ r.basis }}</div></details>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </table>
+    </div>
+    {% endif %}
+  {% endif %}
+
+  <div class="foot">
+    本工具只使用 Apache-2.0 授权的模型（MediaPipe Pose Landmarker、EfficientDet-Lite）。<br>
+    已知无法处理的情况：直立的雕塑、人体模特与玩偶会被识别为人并给出读数，
+    几何方法无法排除；斜侧角度会系统性压低矢状面读数；
+    相机自身的倾斜无法与真实的高低肩区分（除非看「头肩相对侧倾」一项）。<br>
+    详见仓库中的 reports/RELIABILITY.md 与 README.md 的「已知限制」。
+  </div>
+</div>
+</body>
+</html>

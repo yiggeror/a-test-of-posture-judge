@@ -1,0 +1,6 @@
+file_name,coco_image_id,split,source_url,license_id,license_name,redistributable,view_guess,bytes,status
+coco_493888.jpg,493888,train2017,http://farm4.staticflickr.com/3553/3440579181_73116b2897_b.jpg,4,CC BY 2.0,yes,side,158744,ok
+coco_524167.jpg,524167,train2017,http://images.cocodataset.org/train2017/000000524167.jpg,4,CC BY 2.0,yes,side,122571,ok
+coco_80937.jpg,80937,train2017,http://farm8.staticflickr.com/7359/9131254342_baacd0ec5d_b.jpg,5,CC BY-SA 2.0,yes,side,349266,ok
+coco_280839.jpg,280839,train2017,http://images.cocodataset.org/train2017/000000280839.jpg,4,CC BY 2.0,yes,side,266627,ok
+coco_277200.jpg,277200,train2017,http://farm4.staticflickr.com/3169/3036648592_5397d35c55_b.jpg,5,CC BY-SA 2.0,yes,side,142398,ok

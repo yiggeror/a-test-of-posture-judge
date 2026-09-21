@@ -1,0 +1,17 @@
+# Models are fetched by scripts/setup.sh from storage.googleapis.com.
+# ~53 MB of binaries that would otherwise bloat every clone.
+models/
+
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# validate.py --save-overlays output
+**/_overlays/
+
+# Working sets that include NonCommercial-licensed images. These are used for
+# statistics only and must not be redistributed; regenerate them with
+# scripts/coco_mine.py --all-licenses followed by scripts/fetch_from_manifest.py.
+refset/
+candidates*.csv

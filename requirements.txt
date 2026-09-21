@@ -1,0 +1,12 @@
+# Vision stack. Apache-2.0 only -- see README "Licensing" before adding
+# anything here. YOLO-pose (AGPL-3.0) and OpenPose (academic-only) are
+# excluded by policy, not by oversight.
+mediapipe==1.0.1
+numpy>=1.26
+Pillow>=10.0
+
+# Web
+Flask>=3.0
+
+# Tests
+pytest>=8.0
