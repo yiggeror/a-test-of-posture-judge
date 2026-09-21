@@ -364,8 +364,6 @@ def check_is_person(image_rgb: np.ndarray, pose: L.PoseResult,
         return []
     try:
         import mediapipe as mp
-        from mediapipe.tasks import python as mp_python
-        from mediapipe.tasks.python import vision
     except ImportError:
         return []
 

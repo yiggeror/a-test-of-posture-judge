@@ -152,7 +152,8 @@ def _rotate(rgb, deg):
         deg, resample=Image.BICUBIC, expand=True, fillcolor=(255, 255, 255)))
 
 
-def _backmap_identity(shape_before, shape_after):
+def _backmap_identity():
+    """Transforms that leave pixel coordinates alone (JPEG, brightness, ...)."""
     return lambda p: p
 
 
@@ -284,14 +285,20 @@ def main(argv=None) -> int:
         used += 1
         counts["images_used"] = used
 
+        # Each job carries the back-map that undoes its own coordinate change,
+        # so the subject-identity check compares like with like. Rotation's
+        # back-map depends on the expanded canvas size, so it is built below
+        # once the transformed image exists.
         jobs = []
         for q in JPEG_QUALITIES:
-            jobs.append(("jpeg", f"q{q}", _jpeg(base_rgb, q), _backmap_identity, None))
+            jobs.append(("jpeg", f"q{q}", _jpeg(base_rgb, q),
+                         _backmap_identity(), None))
         for s in SCALES:
-            jobs.append(("scale", f"x{s}", _scale(base_rgb, s), _backmap_scale(s), None))
+            jobs.append(("scale", f"x{s}", _scale(base_rgb, s),
+                         _backmap_scale(s), None))
         for kind, f in ENHANCERS:
             jobs.append((kind, f"{f}", _enhance(base_rgb, kind, f),
-                         _backmap_identity, None))
+                         _backmap_identity(), None))
         for th in ROTATIONS:
             jobs.append(("rotate", f"{th:+.0f}", _rotate(base_rgb, th), None, th))
 
@@ -303,12 +310,8 @@ def main(argv=None) -> int:
                 continue
             pose, view, metrics = got
 
-            if theta is not None:
-                bm = _backmap_rotate(theta, base_rgb.shape, rgb.shape)
-            elif callable(backmap) and backmap.__name__ == "_backmap_identity":
-                bm = backmap(base_rgb.shape, rgb.shape)
-            else:
-                bm = backmap
+            bm = (_backmap_rotate(theta, base_rgb.shape, rgb.shape)
+                  if theta is not None else backmap)
 
             drift = _same_subject(b_pose, pose, bm, b_scale)
             if drift > SUBJECT_IDENTITY_MAX_DRIFT:
