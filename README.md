@@ -24,6 +24,8 @@
 详见 [`reports/PHASE0.md`](reports/PHASE0.md)（环境探测）与
 [`reports/PHASE2.md`](reports/PHASE2.md)（验证，含失败案例）。
 
+**换环境接手请先读 [`reports/HANDOFF.md`](reports/HANDOFF.md)。**
+
 第二轮真实数据的处理与发现见 [`reports/PHASE3.md`](reports/PHASE3.md)
 （含两例已证实的假读数：头发遮耳、小腿特写）。
 
