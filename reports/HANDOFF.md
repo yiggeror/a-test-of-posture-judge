@@ -148,7 +148,7 @@ Current outcome:
 |---|---|
 | `shoulder_tilt`, `pelvis_tilt`, `head_tilt`, `head_vs_shoulder_tilt` | `population-percentile`, n=87 |
 | `forward_head`, `shoulder_protraction`, `knee_deviation`, `head_over_hip` | still `guess` — n=10 |
-| `trunk_sway` | still `guess` — refused, its p90 error (37.9°) exceeds the proposed cut (7.6°) |
+| `trunk_sway` | still `guess` — refused, its p90 error (25.3°) exceeds the proposed cut (7.6°) |
 
 A concrete result: the hand-picked `shoulder_tilt` threshold was 2.0°, the
 measured 80th percentile is 6.0°. The guess would have flagged most people.
@@ -164,15 +164,27 @@ photographs: 250–600px subjects, candid, often partly occluded, frequently
 mid-stride. A person deliberately photographing themselves against a plain
 wall is a substantially easier input.
 
-So the measured rate is **a lower bound on nuisance-robustness and plausibly
-an overestimate of the error for good photographs.** I did not separate these.
-`reports/RELIABILITY.md` records a stratification by subject size which is
-suggestive but underpowered on 35 side images.
+`RELIABILITY.md` section 6 goes some way to answering this by re-running the
+whole harness restricted to subjects ≥430px. Sagittal gross-error rates fall
+substantially (forward_head 48%→36%, head_over_hip 43%→25%,
+shoulder_protraction 40%→27%, trunk_sway 48%→32%) and robust slopes move from
+about −0.7 to −0.9, while frontal metrics move by a percentage point or less.
 
-This is the cheapest high-value experiment left: take 20–30 deliberately shot
-side-view photographs and re-run `repeatability.py` on them. If the gross-error
-rate drops sharply, the tool is usable for its actual use case and the fix is
-an input-quality gate. If it does not, the sagittal metrics need rework.
+So: **subject size accounts for a large part of it, and that part is now
+guarded** — the app warns below 430px, with the threshold tagged `measured`.
+
+But it does not account for all of it. At ≥430px the sagittal rates are still
+25–36% against 1–3% frontal. Something intrinsic remains, plausibly the short
+measurement spans and the inferred far-side joints in a lateral view.
+
+The experiment still outstanding: **20–30 deliberately shot side-view
+photographs**, subject filling the frame, plain background, and re-run
+`repeatability.py`. A size stratification of candid photos suggests a
+direction but cannot predict where the rate lands for a photo taken on
+purpose. If it drops to frontal levels, the sagittal metrics are usable behind
+an input-quality gate. If it plateaus near 25%, they need redesign — and
+section 5 says how: `head_over_hip` (±2.1°) rather than `forward_head`
+(±11.6°).
 
 ### 2. Side-view data is still short
 
@@ -238,7 +250,7 @@ than two independent ones is an open design call.
 
 ```bash
 ./scripts/setup.sh                                    # libs + venv + models + tests
-./.venv/bin/python -m pytest tests/ -q                # 144 passed
+./.venv/bin/python -m pytest tests/ -q                # 152 passed
 ./.venv/bin/python app.py                             # http://127.0.0.1:5000
 ./.venv/bin/python scripts/validate.py --dir testdata/front --save-overlays
 ./.venv/bin/python scripts/repeatability.py --dir testdata/front testdata/side

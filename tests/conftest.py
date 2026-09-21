@@ -130,6 +130,24 @@ def make_pose(*, view: str = "side",
                         n_poses_detected=1)
 
 
+def scale_pose(pose: L.PoseResult, factor: float) -> L.PoseResult:
+    """Shrink or enlarge a pose and its canvas together.
+
+    `make_pose` lays the figure out at fixed pixel coordinates, so passing a
+    smaller canvas alone does not make the subject smaller. This scales the
+    landmarks too, which is what a lower-resolution photograph of the same
+    person actually looks like.
+    """
+    lms = [L.Landmark(x=lm.x * factor, y=lm.y * factor, z=lm.z,
+                      visibility=lm.visibility, presence=lm.presence)
+           for lm in pose.landmarks]
+    return L.PoseResult(landmarks=lms,
+                        width=max(1, int(pose.width * factor)),
+                        height=max(1, int(pose.height * factor)),
+                        n_poses_detected=pose.n_poses_detected,
+                        other_pose_bboxes=list(pose.other_pose_bboxes))
+
+
 @pytest.fixture
 def side_pose():
     return make_pose(view="side")

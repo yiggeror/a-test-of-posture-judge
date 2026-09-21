@@ -1,5 +1,5 @@
 {
-  "source": "COCO 2017 person-keypoint images mined by scripts/coco_mine.py (all license ids, statistics only); unscreened general photography, no clinical labels",
+  "source": "COCO 2017 person-keypoint images mined by scripts/coco_mine.py (all license ids, statistics only; the redistributable subset is committed under testdata/). Unscreened general photography, no clinical labels.",
   "n_images_examined": 161,
   "n_images_accepted": 97,
   "min_n_for_percentiles": 20,
@@ -16,7 +16,7 @@
       "abs_p95": 38.352,
       "diagnostic_only": false,
       "usable_for_thresholds": false,
-      "measurement_p90_error_deg": 12.238,
+      "measurement_p90_error_deg": 23.629,
       "threshold_exceeds_noise": true
     },
     "head_over_hip": {
@@ -30,7 +30,7 @@
       "abs_p95": 33.527,
       "diagnostic_only": true,
       "usable_for_thresholds": false,
-      "measurement_p90_error_deg": 11.177,
+      "measurement_p90_error_deg": 22.311,
       "threshold_exceeds_noise": true
     },
     "head_tilt": {
@@ -44,7 +44,7 @@
       "abs_p95": 17.041,
       "diagnostic_only": false,
       "usable_for_thresholds": true,
-      "measurement_p90_error_deg": 6.189,
+      "measurement_p90_error_deg": 5.694,
       "threshold_exceeds_noise": true
     },
     "head_vs_shoulder_tilt": {
@@ -58,7 +58,7 @@
       "abs_p95": 13.261,
       "diagnostic_only": false,
       "usable_for_thresholds": true,
-      "measurement_p90_error_deg": 5.779,
+      "measurement_p90_error_deg": 5.517,
       "threshold_exceeds_noise": true
     },
     "knee_deviation": {
@@ -72,7 +72,7 @@
       "abs_p95": 11.804,
       "diagnostic_only": false,
       "usable_for_thresholds": false,
-      "measurement_p90_error_deg": 10.411,
+      "measurement_p90_error_deg": 10.863,
       "threshold_exceeds_noise": true
     },
     "lateral_head_shift": {
@@ -86,7 +86,7 @@
       "abs_p95": 9.017,
       "diagnostic_only": true,
       "usable_for_thresholds": true,
-      "measurement_p90_error_deg": 2.59,
+      "measurement_p90_error_deg": 2.406,
       "threshold_exceeds_noise": true
     },
     "pelvis_tilt": {
@@ -100,7 +100,7 @@
       "abs_p95": 9.565,
       "diagnostic_only": false,
       "usable_for_thresholds": true,
-      "measurement_p90_error_deg": 3.723,
+      "measurement_p90_error_deg": 3.121,
       "threshold_exceeds_noise": true
     },
     "shoulder_protraction": {
@@ -114,7 +114,7 @@
       "abs_p95": 38.944,
       "diagnostic_only": false,
       "usable_for_thresholds": false,
-      "measurement_p90_error_deg": 9.698,
+      "measurement_p90_error_deg": 22.005,
       "threshold_exceeds_noise": true
     },
     "shoulder_tilt": {
@@ -128,7 +128,7 @@
       "abs_p95": 12.679,
       "diagnostic_only": false,
       "usable_for_thresholds": true,
-      "measurement_p90_error_deg": 2.736,
+      "measurement_p90_error_deg": 2.371,
       "threshold_exceeds_noise": true
     },
     "trunk_sway": {
@@ -142,9 +142,9 @@
       "abs_p95": 9.959,
       "diagnostic_only": false,
       "usable_for_thresholds": false,
-      "measurement_p90_error_deg": 37.925,
+      "measurement_p90_error_deg": 25.308,
       "threshold_exceeds_noise": false,
-      "unusable_reason": "proposed 80th-percentile cut (7.637 deg) is below this metric's own p90 measurement error (37.925 deg), so it cannot separate a real difference from measurement noise"
+      "unusable_reason": "proposed 80th-percentile cut (7.637 deg) is below this metric's own p90 measurement error (25.308 deg), so it cannot separate a real difference from measurement noise"
     }
   }
 }

@@ -114,6 +114,17 @@ CRITICAL_LANDMARKS = (
     L.LEFT_HIP, L.RIGHT_HIP, L.LEFT_ANKLE, L.RIGHT_ANKLE,
 )
 
+# Minimum subject height, shoulder to ankle, in pixels.
+#
+# provenance: measured -- scripts/repeatability.py stratified by subject size
+# over this repo's reference set. Restricting to subjects >= 430px cut the
+# sagittal gross-error rate from 48% to 36% (forward_head), 43% to 25%
+# (head_over_hip), 40% to 27% (shoulder_protraction) and 48% to 32%
+# (trunk_sway), and moved the robust rotation slopes from about -0.7 to about
+# -0.9. Frontal metrics barely moved (1% either way), so this is warned about
+# rather than blocked, and the warning names the sagittal readings.
+MIN_SUBJECT_HEIGHT_PX = 430.0
+
 _DETECTOR_MODEL = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
     "models", "efficientdet_lite0.tflite")
@@ -159,6 +170,27 @@ def check_framing(pose: L.PoseResult) -> list[GuardFinding]:
                         "size_ratio": round(diag / subj_diag, 3)}))
             break
     return out
+
+
+def check_subject_resolution(pose: L.PoseResult, view: ViewEstimate
+                             ) -> list[GuardFinding]:
+    """Warn when the subject is too small for the sagittal metrics to hold up.
+
+    Measured, not assumed: sagittal reliability depends strongly on how many
+    pixels the subject occupies, while frontal reliability barely does. See
+    the provenance note on MIN_SUBJECT_HEIGHT_PX.
+    """
+    scale = L.body_scale(pose)
+    if scale >= MIN_SUBJECT_HEIGHT_PX or view.view == "front":
+        return []
+    return [GuardFinding(
+        key="subject_too_small", severity=SEVERITY_WARN,
+        message_zh=f"人物在画面中偏小（肩到踝约 {scale:.0f} 像素，建议至少 "
+                   f"{MIN_SUBJECT_HEIGHT_PX:.0f} 像素）。实测显示，侧面各项读数的"
+                   "严重误差率在人物偏小时会上升约一半。请离近一些或使用更高分辨率"
+                   "的照片重拍。",
+        detail={"body_scale_px": round(scale, 1),
+                "recommended_min": MIN_SUBJECT_HEIGHT_PX})]
 
 
 def check_proportions(pose: L.PoseResult) -> list[GuardFinding]:
@@ -451,6 +483,7 @@ def run_all(pose: L.PoseResult, view: ViewEstimate, metrics: dict,
     findings: list[GuardFinding] = []
     findings += check_framing(pose)
     findings += check_proportions(pose)
+    findings += check_subject_resolution(pose, view)
     findings += check_view_suitability(view, metrics)
     findings += check_pose_neutrality(metrics)
     if view.view in ("front", "oblique"):

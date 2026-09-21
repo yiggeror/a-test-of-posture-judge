@@ -14,7 +14,7 @@ from posture import landmarks as L
 from posture.metrics import NoiseModel, compute_all
 from posture.view import estimate_view
 
-from .conftest import make_pose
+from .conftest import make_pose, scale_pose
 
 NOISE = NoiseModel(frac_of_body_scale=0.004, provenance="test")
 
@@ -168,3 +168,26 @@ class TestBlockedHelper:
 
     def test_blocked_false_for_empty(self):
         assert G.blocked([]) is False
+
+
+class TestSubjectResolution:
+    def test_large_subject_passes(self, side_pose):
+        # The synthetic figure is ~700px shoulder-to-ankle.
+        v = estimate_view(side_pose)
+        assert G.check_subject_resolution(side_pose, v) == []
+
+    def test_small_side_subject_warns(self):
+        p = scale_pose(make_pose(view="side"), 0.25)   # ~175px shoulder-to-ankle
+        v = estimate_view(p)
+        f = G.check_subject_resolution(p, v)
+        assert "subject_too_small" in keys(f)
+        # A warning, not a block: the measurement showed frontal metrics are
+        # largely unaffected by subject size, so this must not reject uploads.
+        assert all(x.severity == G.SEVERITY_WARN for x in f)
+
+    def test_small_front_subject_does_not_warn(self):
+        # Frontal reliability barely depends on subject size, so warning about
+        # it would be noise unsupported by the measurement.
+        p = scale_pose(make_pose(view="front"), 0.25)
+        v = estimate_view(p)
+        assert G.check_subject_resolution(p, v) == []

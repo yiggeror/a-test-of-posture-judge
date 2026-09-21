@@ -13,7 +13,7 @@ before believing any number it produces.
 
 | | |
 |---|---|
-| Code | working end to end, 144 tests |
+| Code | working end to end, 152 tests |
 | Frontal-plane readings (front photo) | measured precision ~1-3°, thresholds derived from a measured distribution |
 | Sagittal-plane readings (side photo) | **not trustworthy** — 40-48% of readings are off by more than a whole verdict band |
 | Clinical validity | **none, for any metric** — no image anywhere in this project carries a clinical label |
@@ -29,7 +29,7 @@ unmeasured.
 
 ```bash
 ./scripts/setup.sh                              # system libs + venv + models + tests
-./.venv/bin/python -m pytest tests/ -q          # 144 passed
+./.venv/bin/python -m pytest tests/ -q          # 152 passed
 ./.venv/bin/python app.py                       # http://127.0.0.1:5000
 ```
 
@@ -80,7 +80,7 @@ determines itself from the projected shoulder separation.
 | `shoulder_protraction` | shoulder relative to hip ("rounded shoulders") |
 | `trunk_sway` | whole-body forward/backward lean |
 | `knee_deviation` | + flexed / − hyperextended |
-| `head_over_hip` | diagnostic only — ear relative to hip, **does not use the shoulder landmark** |
+| `head_over_hip` | diagnostic only — ear relative to hip, **does not use the shoulder landmark, and is the most precise sagittal reading at ±2.1° against `forward_head`'s ±11.6°** |
 
 Every reading is reported as `value ± uncertainty`. The uncertainty is not a
 decoration: it is propagated from the measured landmark noise through the
@@ -149,6 +149,19 @@ These are measured or confirmed, not hypothetical.
    a flexed knee or a leaning trunk — i.e. the subject was mid-stride rather
    than standing neutrally. That is the guards working, but it means candid
    photographs mostly do not work.
+
+9. **`forward_head` cannot resolve its own thresholds.** At ±11.6° against
+   cut points of 10°/18°, it is below the noise floor, and the app says so
+   rather than offering a verdict. The cause is structural: it measures across
+   the shortest span in the metric set (ear→shoulder, ~9 cm) using the
+   *noisiest* landmark in it — the shoulder, at ~3× the ear's localisation
+   noise. `head_over_hip` measures the same anatomy without the shoulder over
+   four times the span.
+
+10. **Small subjects make the sagittal readings much worse.** Restricting to
+    subjects ≥430px shoulder-to-ankle cuts sagittal gross-error rates by a
+    quarter to a half; frontal rates barely move. The app warns below that
+    size. This is measured, and the threshold is tagged accordingly.
 
 ---
 
