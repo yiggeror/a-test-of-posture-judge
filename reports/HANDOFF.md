@@ -82,20 +82,29 @@ and only downloads the hits. Pool sizes it produces:
 
 | view | all licenses | redistributable (ids 4,5,7,8) |
 |---|---|---|
-| side | 47 | 5 |
+| side | 159 | 30 |
 | front | 114 | 33 |
 
-**One trap worth not repeating.** Requiring *both* ankles to be `V_VISIBLE`
-structurally excludes lateral views: in a true side view the far ankle is
-occluded by the near leg, so annotators mark it `V_OCCLUDED`, not visible.
-The same applies to the far shoulder and far hip. With that predicate, side
-hits were **0**. Relaxing it to "one ankle visible, the other at least
-localised" took it to **33**. The filter was excluding exactly what it was
-built to find.
+**Three traps, all of which punished the view being searched for.** Each was
+found by instrumenting the rejection counts rather than by reasoning about
+them, and together they cost about two orders of magnitude:
 
-This is not a solved problem — 47 side candidates is better than 2 and still
-not enough (see Open questions). But the search is now a query, so widening
-it is a matter of relaxing predicates rather than of looking at more pictures.
+1. **Requiring both ankles `V_VISIBLE`** structurally excludes lateral views —
+   the far ankle is occluded by the near leg, so annotators mark it
+   `V_OCCLUDED`. With this predicate, side hits were **0**.
+2. **Requiring the feet at all.** `head_over_hip` is measured between the ear
+   and the hip; it does not care where the feet are. Demanding them took the
+   pool from ~4900 to 47.
+3. **Gating on COCO's `num_keypoints ≥ 12`.** In a lateral photograph half the
+   body is self-occluded, so a side view scores structurally lower than a
+   front view of equal quality. This alone rejected 500 of 1856 otherwise
+   usable side candidates.
+
+A fourth, smaller one: requiring BOTH wrists below the hips fails when the far
+arm is behind the torso and placed by inference. Changed to ANY.
+
+The search being a query rather than a browsing session is what made these
+findable at all — each was a line in a rejection tally, not a hunch.
 
 ---
 
@@ -272,39 +281,53 @@ The product-naming objection that held this up ("头前引角 is what the produc
 promises") was withdrawn by the repo owner: the goal is judging posture and
 giving advice, not preserving a particular metric name.
 
-### 2. Side-view photographs: searched properly, and they are not there
+### 2. (largely resolved) The side-view shortage was self-inflicted
 
-47 COCO candidates, ~35 classified side, 9 passing all guards, plus 2 studio
-side views from the previous phase. Percentile thresholds need n≥20 and
-ideally n≥100, so the three sagittal thresholds are still `guess`.
-
-**This was re-examined rather than assumed.** Four sources, all actually
-tested:
+This was twice written up as "the photographs do not exist". Four sources were
+tested and the framing — full body, true lateral, ear unobstructed, arms free
+— is genuinely rare:
 
 | source | result |
 |---|---|
-| Pexels (previous phase) | ~1400 images inspected, ~0.1% hit rate |
-| Wikimedia Commons | `Category:Human postures` DOES exist — the previous phase searched the singular. But its contents are paintings, sculpture, sport and 19th-century Bertillon criminal-record photographs; `Category:Anthropometry` is craniometry. Free-text file search returns menhirs, cicadas and birds. **Content type does not match; the 0 hits were not a method error.** |
-| COCO | 268k annotated instances → 47 side candidates. Used. |
-| DeepFashion (13.7k e-commerce model photos, HF) | 100 sampled → **0 side views, 100% blocked for feet out of frame.** Fashion photography crops at the knee. Also research-only licensing. |
+| Pexels (previous phase) | ~1400 inspected, ~0.1% hit rate |
+| Wikimedia Commons | `Category:Human postures` DOES exist (the previous phase searched the singular), but holds paintings, sculpture and 19th-century Bertillon record photographs. Free-text search returns menhirs and cicadas. Content type does not match. |
+| DeepFashion (13.7k) | 100 sampled → 0 side views, 100% cropped at the knee |
+| COCO | 268k instances |
 
-`scripts/commons_explore.py` is committed so the Commons search is repeatable
-rather than a claim. The conclusion is that this framing — full body including
-feet, true lateral, ear unobstructed, arms hanging free — is genuinely rare in
-public image collections, and no better search fixes it.
+**But the binding constraint was not scarcity. It was my own filter.**
+`head_over_hip` is measured between the ear and the hip. It does not care
+where the feet are. Both the miner and the runtime guard demanded the ankles
+anyway, and a blanket "any landmark out of frame → reject the photo" rule:
 
-Still untried: MPII Human Pose (25k images, but the HuggingFace mirror ships
-images only; the original annotations with activity labels would need fetching
-from the MPII site, which is reachable), and asking a user to photograph
-themselves.
+| criterion | side candidates |
+|---|---|
+| requiring feet in frame + whole-photo blocking | **47** |
+| ear + shoulders + hips visible, feet optional | **4924** |
 
-**What was done instead, and it worked:** `scripts/synthetic_warp.py` turns
-each side-view photograph into 8 ground-truth test cases by applying a known
-geometric shear. 38 images became 284 comparisons — a 25× expansion of the
-sagittal evidence base without a single new photograph. It does not solve the
-threshold problem (a warped photo tells you nothing about what value is
-*typical* in a population) but it solved the accuracy problem, which was the
-more important of the two. See RELIABILITY.md section 4.
+Two more filters were unfair to lateral views specifically: COCO's
+`num_keypoints ≥ 12` penalises exactly the view being searched for (half the
+body is self-occluded, so a side view scores structurally lower than a front
+view of equal quality — it rejected 500 of 1856 usable candidates), and
+requiring BOTH wrists below the hips fails when the far arm is behind the
+torso and placed by inference.
+
+The previous phase had already got this right and I did not read it closely
+enough: PHASE3 classified a feet-cropped photo as "side (partial)" —
+「耳、肩为真实观测，头/肩类指标成立；踝点在画面外，两项踝依赖指标已被自动拦下」.
+That is per-metric availability, which is now implemented:
+`guards.unavailable_metrics()` withholds only the metrics resting on an
+out-of-frame landmark, and `body_scale` falls back to the torso so it never
+measures to an extrapolated ankle.
+
+**Outcome.** Usable side-view readings went from n=11 to **n=35**, which
+crosses the n≥20 minimum, so `head_over_hip` and `shoulder_protraction` now
+carry measured percentile thresholds instead of guesses. `testdata/side/` grew
+from 5 to 31 committed images.
+
+Still open: n=35 clears the minimum but is not a stable percentile estimate
+(n≥100 would be). The miner's remaining big rejection buckets are
+`person_too_small` and `multiple_people`, both still conservative, and the
+same feet-optional relaxation has not yet been applied to front-view mining.
 
 ### 3. Real repeatability is still unmeasured
 
@@ -353,7 +376,7 @@ than two independent ones is an open design call.
 
 ```bash
 ./scripts/setup.sh                                    # libs + venv + models + tests
-./.venv/bin/python -m pytest tests/ -q                # 167 passed
+./.venv/bin/python -m pytest tests/ -q                # 175 passed
 ./.venv/bin/python app.py                             # http://127.0.0.1:5000
 ./.venv/bin/python scripts/validate.py --dir testdata/front --save-overlays
 ./.venv/bin/python scripts/repeatability.py --dir testdata/front testdata/side

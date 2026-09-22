@@ -75,9 +75,9 @@
       <button type="submit">开始分析</button>
     </form>
     <div class="kv" style="margin-top:14px">
-      <span>正面照 → 高低肩 / 骨盆侧倾 / 头部侧倾</span>
-      <span>侧面照 → 头前引 / 圆肩 / 躯干前后倾 / 膝关节</span>
-      <span>需要完整全身、双脚在画面内</span>
+      <span>正面照 → 高低肩 / 骨盆侧倾 / 头部侧偏</span>
+      <span>侧面照 → 头部前移 / 圆肩 / 躯干前后倾</span>
+      <span>双脚在画面内最好，缺了只会停用「躯干前后倾」一项</span>
       <span>手臂自然垂放</span>
     </div>
   </div>
@@ -126,6 +126,22 @@
           </div>
         </div>
       </div>
+    </div>
+    {% endif %}
+
+    {% if result.unavailable %}
+    <div class="card">
+      <h2 style="margin-top:0">以下指标本次不可用</h2>
+      <div class="basis" style="border:0;padding:0;margin-bottom:10px">
+        这些指标依赖的关键点落在画面之外，模型只能推测它们的位置，
+        因此本次不给出读数。其余指标不受影响。
+      </div>
+      <table>
+        <tr><th>指标</th><th>缺少的关键点</th></tr>
+        {% for u in result.unavailable %}
+        <tr><td>{{ u.label_zh }}</td><td class="unc">{{ u.landmarks|join('、') }}</td></tr>
+        {% endfor %}
+      </table>
     </div>
     {% endif %}
 

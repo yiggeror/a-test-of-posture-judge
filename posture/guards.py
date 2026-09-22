@@ -152,24 +152,66 @@ class GuardFinding:
     detail: dict = field(default_factory=dict)
 
 
-def check_framing(pose: L.PoseResult) -> list[GuardFinding]:
-    """Landmarks outside the image, and multiple people."""
-    out: list[GuardFinding] = []
+def out_of_frame_landmarks(pose: L.PoseResult) -> set[int]:
+    """Indices of landmarks that fall outside the image.
+
+    MediaPipe extrapolates past the border -- a photo cropped at the shins
+    still yields an ankle, hundreds of pixels below the last row that exists,
+    with a plausible visibility. Such a point is a guess, not an observation.
+
+    This returns the set rather than blocking, because cropping is NOT a
+    whole-photo verdict. `head_over_hip` uses the ear and the hip and does not
+    care whether the feet are in frame; `trunk_sway` uses the ankle and does.
+    Blocking the entire upload on any out-of-frame landmark throws away
+    readings that were perfectly well observed -- and, when the same rule was
+    applied to candidate mining, cut the pool of usable side-view photographs
+    by about two orders of magnitude.
+    """
     scale = L.body_scale(pose)
     margin = OUT_OF_FRAME_MARGIN * scale
-
-    escaped = []
-    for idx in CRITICAL_LANDMARKS:
+    escaped = set()
+    for idx in range(L.N_LANDMARKS):
         x, y = pose.xy(idx)
         if (x < -margin or x > pose.width + margin
                 or y < -margin or y > pose.height + margin):
-            escaped.append(L.LANDMARK_NAMES[idx])
-    if escaped:
+            escaped.add(idx)
+    return escaped
+
+
+def unavailable_metrics(pose: L.PoseResult, metrics: dict
+                        ) -> dict[str, list[str]]:
+    """Which metrics rest on a landmark that is not actually in the picture.
+
+    Returns {metric_key: [landmark names]}. Callers withhold those metrics
+    and report the rest.
+    """
+    oof = out_of_frame_landmarks(pose)
+    out: dict[str, list[str]] = {}
+    for key, m in metrics.items():
+        bad = [L.LANDMARK_NAMES[i] for i in m.landmark_indices if i in oof]
+        if bad:
+            out[key] = bad
+    return out
+
+
+def check_framing(pose: L.PoseResult) -> list[GuardFinding]:
+    """Multiple people, and a note when part of the subject is cropped.
+
+    Cropping is reported as a WARNING here; which specific metrics it
+    invalidates is decided per metric by `unavailable_metrics`.
+    """
+    out: list[GuardFinding] = []
+
+    escaped = out_of_frame_landmarks(pose)
+    named = sorted(L.LANDMARK_NAMES[i] for i in escaped
+                   if i in CRITICAL_LANDMARKS)
+    if named:
         out.append(GuardFinding(
-            key="landmarks_out_of_frame", severity=SEVERITY_BLOCK,
-            message_zh="关键点超出画面范围，说明人物被裁切，超框点的位置是推测的，"
-                       "不能用于测量。请上传完整全身照。",
-            detail={"landmarks": escaped}))
+            key="landmarks_out_of_frame", severity=SEVERITY_WARN,
+            message_zh="以下关键点在画面之外，模型是推测出它们位置的："
+                       + "、".join(named)
+                       + "。依赖这些点的指标已单独停用，其余读数不受影响。",
+            detail={"landmarks": named}))
 
     subj = _bbox(pose)
     subj_diag = math.hypot(subj[2] - subj[0], subj[3] - subj[1])
@@ -255,17 +297,47 @@ def check_pose_neutrality(metrics: dict) -> list[GuardFinding]:
     return out
 
 
+def _frontal_arms_only(pose: L.PoseResult, scale: float) -> list[GuardFinding]:
+    """The subset of the frontal neutrality checks that needs no ankles."""
+    out: list[GuardFinding] = []
+    lhip, rhip = pose.xy(L.LEFT_HIP), pose.xy(L.RIGHT_HIP)
+    lw, rw = pose.xy(L.LEFT_WRIST), pose.xy(L.RIGHT_WRIST)
+    raised = [name for name, w, hip in
+              (("left", lw, lhip), ("right", rw, rhip))
+              if (w[1] - hip[1]) / scale < MIN_WRIST_BELOW_HIP_FRAC]
+    if raised:
+        out.append(GuardFinding(
+            key="arms_not_at_side", severity=SEVERITY_WARN,
+            message_zh="手臂没有自然垂放（抱臂、叉腰、插兜都会如此）。"
+                       "这会改变肩部关键点的位置，肩相关读数请谨慎参考。",
+            detail={"raised": raised}))
+    return out
+
+
 def check_frontal_neutrality(pose: L.PoseResult) -> list[GuardFinding]:
     """Frontal-plane equivalent of check_pose_neutrality.
 
     Without this, a front view is held to a weaker standard than a side view:
     the knee and trunk guards only fire on sagittal metrics, so a front photo
     of someone mid-stride would be measured and reported without complaint.
+
+    The stance, weight-shift and knee tests all need the ankles. When the
+    ankles are outside the image MediaPipe supplies extrapolated positions,
+    and running these checks on them produces confident nonsense -- a photo
+    cropped at the thigh would get a stance-width verdict computed from two
+    invented points. Those checks are skipped in that case; the frontal
+    metrics themselves (shoulder, hip, head) do not need the ankles and are
+    unaffected.
     """
     out: list[GuardFinding] = []
     scale = L.body_scale(pose)
     if scale <= 1e-6:
         return out
+
+    oof = out_of_frame_landmarks(pose)
+    ankles_usable = (L.LEFT_ANKLE not in oof and L.RIGHT_ANKLE not in oof)
+    if not ankles_usable:
+        return _frontal_arms_only(pose, scale)
 
     lank, rank = pose.xy(L.LEFT_ANKLE), pose.xy(L.RIGHT_ANKLE)
     lhip, rhip = pose.xy(L.LEFT_HIP), pose.xy(L.RIGHT_HIP)

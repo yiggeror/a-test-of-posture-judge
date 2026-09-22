@@ -71,14 +71,25 @@ REDISTRIBUTABLE_LICENSES = (4, 5, 7, 8)
 #   literature-adjacent- taken from published anthropometry, adapted
 #   measured           - computed from data in this repo
 
-# Biacromial (shoulder) width is ~0.40 m and shoulder-to-ankle height is
-# ~1.38 m for a median adult, so a fully front-facing subject projects a
-# shoulder spread of ~0.29 of their shoulder-to-ankle height. A true lateral
-# view projects that spread to near zero. These cut points sit either side of
-# that range with margin for camera roll and stance width.
+# View is judged from shoulder spread normalised by TORSO length
+# (shoulder-to-hip), not by shoulder-to-ankle height. Torso length is
+# available whether or not the feet are in frame, and most usable side-view
+# photographs are cropped somewhere below the knee -- normalising by a span
+# that needs the ankles discards them before they are ever looked at.
+#
+# Biacromial width is ~0.40 m against a ~0.50 m torso, so a fully front-facing
+# adult projects ~0.80 and a true lateral view ~0. These cut points are the
+# old shoulder-to-ankle ones (0.14 / 0.22) rescaled by the 1.38/0.50 ratio
+# between the two spans, so the geometry is unchanged.
 # provenance: geometric-estimate (Pheasant anthropometry, ratio derived here)
-SIDE_MAX_SHOULDER_SPREAD = 0.14
-FRONT_MIN_SHOULDER_SPREAD = 0.20
+SIDE_MAX_SHOULDER_SPREAD = 0.38
+FRONT_MIN_SHOULDER_SPREAD = 0.60
+
+# Standing test when the ankles are NOT in frame: in a lateral view a standing
+# subject's hip-to-knee segment is near vertical, while a seated one's is near
+# horizontal. The two are ~90 deg apart, so this cut sits in a wide gap.
+# provenance: geometric-estimate (seated vs standing thigh orientation)
+MAX_THIGH_ANGLE_FROM_VERTICAL = 40.0
 
 # A standing adult's hip-to-ankle vertical span is ~50% of their eye-to-ankle
 # span. Sitting or crouching collapses this ratio well below 0.40.
@@ -104,9 +115,15 @@ MIN_PERSON_HEIGHT_PX = 380
 # provenance: guess
 MAX_BYSTANDER_AREA_RATIO = 0.15
 
-# Keypoint count below which an instance is too sparsely annotated to judge.
-# provenance: guess
-MIN_KEYPOINTS = 12
+# Total keypoint count is NOT used as a gate. It penalises exactly the view
+# being searched for: in a lateral photograph half the body is self-occluded,
+# so COCO's num_keypoints is structurally lower for side views than for front
+# views of equal quality. Gating on it rejected 500 of 1856 otherwise-usable
+# side candidates. What matters is whether the SPECIFIC points each metric
+# needs are present, which extract_features and passes() check directly.
+# Retained only as a floor against near-empty annotations.
+# provenance: geometric-estimate (self-occlusion in a lateral view)
+MIN_KEYPOINTS = 7
 
 
 def _pt(kps: list[int], idx: int) -> tuple[float, float, int]:
@@ -143,18 +160,23 @@ def extract_features(ann: dict[str, Any]) -> dict[str, Any] | None:
     if mid_sh is None or mid_hip is None:
         return None
 
-    # Feet must be in frame -- the most common late-stage rejection in the
-    # previous phase. But requiring BOTH ankles to be V_VISIBLE structurally
-    # excludes lateral views, because in a true side view the far ankle is
-    # occluded by the near leg and annotators mark it V_OCCLUDED. The same
-    # applies to the far shoulder and far hip. So the rule is: at least one
-    # ankle actually visible, and the other at least localised. COCO annotators
-    # do supply coordinates for V_OCCLUDED points, so the midpoint stays valid.
-    if la[2] == V_ABSENT or ra[2] == V_ABSENT:
-        return None
-    if la[2] != V_VISIBLE and ra[2] != V_VISIBLE:
-        return None
-    mid_ankle = ((la[0] + ra[0]) / 2.0, (la[1] + ra[1]) / 2.0)
+    # Feet are OPTIONAL. Two separate traps live here, and both cost most of
+    # the candidate pool:
+    #
+    #  1. Requiring both ankles V_VISIBLE structurally excludes lateral views,
+    #     because in a true side view the far ankle is occluded by the near
+    #     leg and annotators mark it V_OCCLUDED.
+    #  2. Requiring the feet AT ALL discards photographs that fully support
+    #     the head and shoulder metrics. `head_over_hip` uses the ear and the
+    #     hip; it does not care where the feet are. Demanding them cut the
+    #     side-view pool from ~4900 to 47.
+    #
+    # So the ankles are recorded when usable and the downstream metrics that
+    # need them are withheld per metric, exactly as posture/guards.py does.
+    has_ankles = (la[2] != V_ABSENT and ra[2] != V_ABSENT
+                  and (la[2] == V_VISIBLE or ra[2] == V_VISIBLE))
+    mid_ankle = (((la[0] + ra[0]) / 2.0, (la[1] + ra[1]) / 2.0)
+                 if has_ankles else None)
 
     # Head reference: topmost labelled head point.
     head_candidates = [p for p in (nose, lear, rear,
@@ -164,20 +186,37 @@ def extract_features(ann: dict[str, Any]) -> dict[str, Any] | None:
         return None
     head_y = min(p[1] for p in head_candidates)
 
-    shoulder_ankle_h = mid_ankle[1] - mid_sh[1]
-    head_ankle_h = mid_ankle[1] - head_y
-    if shoulder_ankle_h <= 1.0 or head_ankle_h <= 1.0:
+    torso_h = mid_hip[1] - mid_sh[1]
+    if torso_h <= 1.0:
         return None  # not upright, or degenerate
+    head_hip_h = mid_hip[1] - head_y
+    shoulder_ankle_h = (mid_ankle[1] - mid_sh[1]) if mid_ankle else None
+    head_ankle_h = (mid_ankle[1] - head_y) if mid_ankle else None
 
-    # View proxy: horizontal separation of the shoulders, normalised by
-    # shoulder-to-ankle height so it is scale- and distance-invariant.
-    shoulder_spread = abs(ls[0] - rs[0]) / shoulder_ankle_h if (
+    # View proxy: horizontal separation of the shoulders, normalised by TORSO
+    # length so it works whether or not the feet are in frame.
+    shoulder_spread = abs(ls[0] - rs[0]) / torso_h if (
         ls[2] != V_ABSENT and rs[2] != V_ABSENT) else None
-    hip_spread = abs(lh[0] - rh[0]) / shoulder_ankle_h if (
+    hip_spread = abs(lh[0] - rh[0]) / torso_h if (
         lh[2] != V_ABSENT and rh[2] != V_ABSENT) else None
 
-    # Standing proxy: proportion of the body taken up by the legs.
-    leg_fraction = (mid_ankle[1] - mid_hip[1]) / head_ankle_h
+    # Standing proxy. With the ankles, use the leg's share of body height.
+    leg_fraction = ((mid_ankle[1] - mid_hip[1]) / head_ankle_h
+                    if mid_ankle and head_ankle_h and head_ankle_h > 1 else None)
+
+    # Without them, use thigh orientation: a standing thigh is near vertical,
+    # a seated one near horizontal.
+    thigh_angle = None
+    thighs = []
+    for hip, knee in ((lh, lk), (rh, rk)):
+        if V_ABSENT in (hip[2], knee[2]):
+            continue
+        dx, dy = knee[0] - hip[0], knee[1] - hip[1]
+        if math.hypot(dx, dy) < 1.0:
+            continue
+        thighs.append(abs(math.degrees(math.atan2(dx, dy))))
+    if thighs:
+        thigh_angle = min(thighs)
 
     # Leg extension: distance from each knee to its hip-ankle line, as a
     # fraction of leg length. Large values mean a bent knee.
@@ -201,21 +240,29 @@ def extract_features(ann: dict[str, Any]) -> dict[str, Any] | None:
     # Arms-at-side proxy: wrists below hip level. The previous phase found the
     # dominant failure mode was arms crossed / on hips / in pockets, all of
     # which raise the wrists to or above hip height.
+    #
+    # ANY rather than ALL: in a lateral view the far arm is behind the torso
+    # and is frequently mislabelled or placed by inference, so requiring both
+    # wrists to be low rejects side views for a reason that is about
+    # annotation rather than about the pose.
     wrists_below_hips = None
     wrist_pts = [p for p in (_pt(kps, KP["left_wrist"]), _pt(kps, KP["right_wrist"]))
                  if p[2] != V_ABSENT]
     if wrist_pts:
-        wrists_below_hips = all(w[1] > mid_hip[1] for w in wrist_pts)
+        wrists_below_hips = any(w[1] > mid_hip[1] for w in wrist_pts)
 
     return {
         "shoulder_spread": shoulder_spread,
         "hip_spread": hip_spread,
         "leg_fraction": leg_fraction,
+        "thigh_angle": thigh_angle,
+        "has_ankles": has_ankles,
+        "torso_px": torso_h,
         "knee_offset": knee_offset,
         "n_ears_visible": n_ears_visible,
         "n_ears_labelled": n_ears_labelled,
         "wrists_below_hips": wrists_below_hips,
-        "person_height_px": head_ankle_h,
+        "person_height_px": head_ankle_h if head_ankle_h else head_hip_h * 1.95,
         "num_keypoints": ann.get("num_keypoints", 0),
     }
 
@@ -234,14 +281,35 @@ def classify_view(f: dict[str, Any]) -> str:
     return "oblique"
 
 
-def passes(f: dict[str, Any], view: str, want: str, min_height: float) -> tuple[bool, str]:
+def passes(f: dict[str, Any], view: str, want: str, min_height: float,
+           require_feet: bool = False) -> tuple[bool, str]:
     """Apply the acceptance gate. Returns (accepted, reason_if_rejected)."""
     if f["num_keypoints"] < MIN_KEYPOINTS:
         return False, "too_few_keypoints"
-    if f["person_height_px"] < min_height:
+    # Size is judged on the TORSO, the span the head and shoulder metrics are
+    # actually measured across. Estimating whole-body height from the torso
+    # and then gating on that just adds a conversion error for photographs
+    # whose legs are out of frame.
+    if f["torso_px"] < min_height / 2.83:
         return False, "person_too_small"
-    if not (STAND_MIN_LEG_FRACTION <= f["leg_fraction"] <= STAND_MAX_LEG_FRACTION):
-        return False, "not_standing"
+
+    if require_feet and not f["has_ankles"]:
+        return False, "no_feet_in_frame"
+
+    # Standing test, adapted to what is actually visible. With the ankles,
+    # use the legs' share of body height. Without them, use thigh
+    # orientation -- a standing thigh is near vertical, a seated one near
+    # horizontal, and the two are ~90 deg apart.
+    if f["leg_fraction"] is not None:
+        if not (STAND_MIN_LEG_FRACTION <= f["leg_fraction"]
+                <= STAND_MAX_LEG_FRACTION):
+            return False, "not_standing"
+    elif f["thigh_angle"] is not None:
+        if f["thigh_angle"] > MAX_THIGH_ANGLE_FROM_VERTICAL:
+            return False, "not_standing_thigh"
+    else:
+        return False, "cannot_verify_standing"
+
     if f["knee_offset"] is not None and f["knee_offset"] > KNEE_MAX_OFFSET_FRACTION:
         return False, "knee_bent"
     if f["wrists_below_hips"] is False:
@@ -268,6 +336,11 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--max-bystander", type=float, default=MAX_BYSTANDER_AREA_RATIO,
                     help="reject if another person's area exceeds this fraction "
                          "of the subject's")
+    ap.add_argument("--require-feet", action="store_true",
+                    help="only keep photos with the ankles in frame. Off by "
+                         "default: head and shoulder metrics do not need the "
+                         "feet, and demanding them cut the side-view pool "
+                         "from ~4900 to 47.")
     ap.add_argument("--all-licenses", action="store_true",
                     help="keep every license. Use for computing reference "
                          "statistics only -- images under COCO license ids "
@@ -325,7 +398,8 @@ def main(argv: list[str] | None = None) -> int:
                 continue
 
             view = classify_view(f)
-            ok, why = passes(f, view, args.view, args.min_height_px)
+            ok, why = passes(f, view, args.view, args.min_height_px,
+                             require_feet=args.require_feet)
             if not ok:
                 reasons[why] += 1
                 continue
@@ -343,7 +417,12 @@ def main(argv: list[str] | None = None) -> int:
                 "shoulder_spread": round(f["shoulder_spread"], 4)
                 if f["shoulder_spread"] is not None else "",
                 "hip_spread": round(f["hip_spread"], 4) if f["hip_spread"] is not None else "",
-                "leg_fraction": round(f["leg_fraction"], 4),
+                "leg_fraction": round(f["leg_fraction"], 4)
+                if f["leg_fraction"] is not None else "",
+                "thigh_angle": round(f["thigh_angle"], 1)
+                if f["thigh_angle"] is not None else "",
+                "has_ankles": int(bool(f["has_ankles"])),
+                "torso_px": round(f["torso_px"], 1),
                 "knee_offset": round(f["knee_offset"], 4)
                 if f["knee_offset"] is not None else "",
                 "n_ears_visible": f["n_ears_visible"],

@@ -236,19 +236,31 @@ def body_scale(pose: PoseResult) -> float:
     """A length to normalise pixel distances by.
 
     Shoulder-midpoint to ankle-midpoint, which is robust to the subject's
-    distance from the camera and does not depend on the head landmarks (which
-    are the least reliable ones). Falls back to shoulder-to-hip if the ankles
-    are missing, scaled by the population ratio between the two spans.
+    distance from the camera and does not depend on the head landmarks (the
+    least reliable ones).
+
+    Falls back to shoulder-to-hip when an ankle is outside the image. That
+    case is common and must not be fudged: MediaPipe extrapolates a confident
+    ankle position hundreds of pixels below a photo cropped at the shins, and
+    measuring to it would silently inflate every normalised quantity --
+    including the out-of-frame margin that detects the cropping in the first
+    place. The in-bounds test here is deliberately margin-free to keep that
+    from becoming circular.
     """
     from .geometry import distance, midpoint
 
     sh = midpoint(pose.xy(LEFT_SHOULDER), pose.xy(RIGHT_SHOULDER))
     hip = midpoint(pose.xy(LEFT_HIP), pose.xy(RIGHT_HIP))
-    ank = midpoint(pose.xy(LEFT_ANKLE), pose.xy(RIGHT_ANKLE))
 
-    d = distance(sh, ank)
-    if d > 1.0:
-        return d
+    def in_frame(idx: int) -> bool:
+        x, y = pose.xy(idx)
+        return 0 <= x <= pose.width and 0 <= y <= pose.height
+
+    if in_frame(LEFT_ANKLE) and in_frame(RIGHT_ANKLE):
+        ank = midpoint(pose.xy(LEFT_ANKLE), pose.xy(RIGHT_ANKLE))
+        d = distance(sh, ank)
+        if d > 1.0:
+            return d
     # Shoulder-to-ankle is ~2.6x shoulder-to-hip in a median adult.
     # provenance: geometric-estimate (segment proportions)
     return distance(sh, hip) * 2.6

@@ -121,6 +121,9 @@ class Assessment:
     findings: list[G.GuardFinding]
     blocked: bool
     noise: NoiseModel
+    # metric key -> landmark names that are outside the image, so the metric
+    # was measured from an extrapolated point and is withheld
+    unavailable: dict[str, list[str]] = field(default_factory=dict)
     error_zh: str = ""
 
     @property
@@ -173,11 +176,26 @@ def assess(image_rgb: np.ndarray, *, deep_guards: bool = True,
     findings = G.run_all(pose, view, measurements, image_rgb, deep=deep_guards)
     is_blocked = G.blocked(findings)
 
+    # A cropped photo is not a whole-photo failure. Withhold only the metrics
+    # that actually rest on a landmark outside the image, and report the rest.
+    unavailable = G.unavailable_metrics(pose, measurements)
+
     specs = load_thresholds()
+    judged = [k for k in measurements
+              if k not in DIAGNOSTIC_ONLY and k in specs]
+    if judged and all(k in unavailable for k in judged):
+        # Nothing survives; now it IS a whole-photo failure.
+        is_blocked = True
+        findings.append(G.GuardFinding(
+            key="all_metrics_unavailable", severity=G.SEVERITY_BLOCK,
+            message_zh="这张照片里可用的关键点不足以支持任何一项判定，"
+                       "通常是人物被裁切得太多。请上传更完整的照片。",
+            detail={"unavailable": unavailable}))
+
     verdicts: dict[str, MetricVerdict] = {}
     if not is_blocked:
         for key, m in measurements.items():
-            if key in DIAGNOSTIC_ONLY:
+            if key in DIAGNOSTIC_ONLY or key in unavailable:
                 continue
             spec = specs.get(key)
             if spec is None:
@@ -196,7 +214,7 @@ def assess(image_rgb: np.ndarray, *, deep_guards: bool = True,
 
     return Assessment(ok=not is_blocked, view=view, measurements=measurements,
                       verdicts=verdicts, findings=findings, blocked=is_blocked,
-                      noise=noise)
+                      noise=noise, unavailable=unavailable)
 
 
 def assess_file(path: str, **kw) -> Assessment:

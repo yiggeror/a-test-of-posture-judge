@@ -31,13 +31,41 @@ class TestFraming:
     def test_clean_pose_passes(self, side_pose):
         assert G.check_framing(side_pose) == []
 
-    def test_landmark_outside_frame_blocks(self):
+    def test_landmark_outside_frame_warns_but_does_not_block(self):
+        # Contract change: a crop is not a whole-photo failure. It invalidates
+        # the metrics that rest on the cropped landmark and nothing else.
+        # Applying it as a blanket block also cut the minable pool of
+        # side-view photographs by about two orders of magnitude.
         p = make_pose(view="side")
-        lm = p.landmarks[L.LEFT_ANKLE]
-        p.landmarks[L.LEFT_ANKLE] = L.Landmark(lm.x, p.height + 200, lm.z, 1.0, 1.0)
+        for idx in (L.LEFT_ANKLE, L.RIGHT_ANKLE):
+            lm = p.landmarks[idx]
+            p.landmarks[idx] = L.Landmark(lm.x, p.height + 200, lm.z, 1.0, 1.0)
         f = G.check_framing(p)
         assert "landmarks_out_of_frame" in keys(f)
-        assert all(x.severity == G.SEVERITY_BLOCK for x in f)
+        assert all(x.severity == G.SEVERITY_WARN for x in f
+                   if x.key == "landmarks_out_of_frame")
+
+    def test_out_of_frame_set_identifies_the_cropped_points(self):
+        p = make_pose(view="side")
+        for idx in (L.LEFT_ANKLE, L.RIGHT_ANKLE):
+            lm = p.landmarks[idx]
+            p.landmarks[idx] = L.Landmark(lm.x, p.height + 300, lm.z, 1.0, 1.0)
+        oof = G.out_of_frame_landmarks(p)
+        assert L.LEFT_ANKLE in oof and L.RIGHT_ANKLE in oof
+        assert L.LEFT_EAR not in oof and L.LEFT_HIP not in oof
+
+    def test_cropped_feet_withhold_only_foot_dependent_metrics(self):
+        # head_over_hip uses ear+hip and must survive; trunk_sway uses the
+        # ankle and must not.
+        p = make_pose(view="side")
+        for idx in (L.LEFT_ANKLE, L.RIGHT_ANKLE):
+            lm = p.landmarks[idx]
+            p.landmarks[idx] = L.Landmark(lm.x, p.height + 300, lm.z, 1.0, 1.0)
+        m = metrics_for(p)
+        un = G.unavailable_metrics(p, m)
+        assert "trunk_sway" in un
+        assert "head_over_hip" not in un
+        assert "forward_head" not in un
 
     def test_comparable_second_person_blocks(self, side_pose):
         side_pose.n_poses_detected = 2
@@ -210,3 +238,28 @@ class TestFrontalKneeExtension:
         assert "knees_not_extended" in keys(f)
         assert all(x.severity == G.SEVERITY_BLOCK for x in f
                    if x.key == "knees_not_extended")
+
+
+class TestFrontalNeutralityWithCroppedFeet:
+    def test_ankle_dependent_checks_are_skipped_when_feet_are_cropped(self):
+        # Running stance-width on extrapolated ankles produces a confident
+        # verdict computed from two invented points.
+        p = make_pose(view="front")
+        for idx in (L.LEFT_ANKLE, L.RIGHT_ANKLE):
+            lm = p.landmarks[idx]
+            p.landmarks[idx] = L.Landmark(lm.x * 3, p.height + 400, lm.z, 1.0, 1.0)
+        k = keys(G.check_frontal_neutrality(p))
+        assert "stance_too_wide" not in k
+        assert "knees_not_extended" not in k
+        assert "weight_on_one_leg" not in k
+
+    def test_arm_check_still_runs_without_feet(self):
+        p = make_pose(view="front")
+        for idx in (L.LEFT_ANKLE, L.RIGHT_ANKLE):
+            lm = p.landmarks[idx]
+            p.landmarks[idx] = L.Landmark(lm.x, p.height + 400, lm.z, 1.0, 1.0)
+        for idx in (L.LEFT_WRIST, L.RIGHT_WRIST):
+            lm = p.landmarks[idx]
+            p.landmarks[idx] = L.Landmark(lm.x, p.landmarks[L.LEFT_SHOULDER].y,
+                                          lm.z, 1.0, 1.0)
+        assert "arms_not_at_side" in keys(G.check_frontal_neutrality(p))

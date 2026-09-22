@@ -27,6 +27,17 @@ app.config["MAX_CONTENT_LENGTH"] = 24 * 1024 * 1024  # 24 MB
 
 ALLOWED = {"png", "jpg", "jpeg", "webp", "bmp"}
 
+# Labels for metrics that were withheld before a verdict was built, so they
+# have no ThresholdSpec to read a label from.
+_METRIC_LABELS = {
+    "head_over_hip": "头部前移", "shoulder_protraction": "圆肩（肩前移）",
+    "trunk_sway": "躯干前后倾", "shoulder_tilt": "高低肩",
+    "pelvis_tilt": "骨盆侧倾", "lateral_head_shift": "头部侧偏",
+    "forward_head": "耳肩角（辅助）", "head_tilt": "头部侧倾（辅助）",
+    "head_vs_shoulder_tilt": "头肩相对侧倾（辅助）",
+    "knee_deviation": "膝关节角度（守卫用）",
+}
+
 PROVENANCE_ZH = {
     "guess": "凭经验设定，没有依据",
     "geometric-estimate": "由人体比例/投影几何推导",
@@ -87,6 +98,8 @@ def do_assess():
 
     rows = []
     for key, m in a.measurements.items():
+        if key in a.unavailable:
+            continue
         v = a.verdicts.get(key)
         rows.append({
             "key": key,
@@ -112,8 +125,16 @@ def do_assess():
     # Diagnostics last: they are context for the readings above, not verdicts.
     rows.sort(key=lambda r: (r["diagnostic"], r["plane"] != "sagittal"))
 
+    unavailable_rows = [
+        {"key": k, "label_zh": (a.verdicts[k].spec.label_zh if k in a.verdicts
+                                else _METRIC_LABELS.get(k, k)),
+         "landmarks": names}
+        for k, names in a.unavailable.items()
+    ]
+
     result = {
         "ok": a.ok,
+        "unavailable": unavailable_rows,
         "blocked": a.blocked,
         "error": a.error_zh,
         "view": a.view,

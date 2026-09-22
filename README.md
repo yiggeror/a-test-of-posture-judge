@@ -13,13 +13,14 @@ before believing any number it produces.
 
 | | |
 |---|---|
-| Code | working end to end, 167 tests |
+| Code | working end to end, 175 tests |
 | Rotation tracking, all 9 metrics | **within 0.05 of theory** on two independent image sets |
 | Response to a **real** posture change | slope **1.007** / **0.984** — does not under-report actual deviation |
 | Frontal readings | reliable: 1–3% gross error, thresholds from a measured distribution |
 | Sagittal readings, long-span (`head_over_hip`, `shoulder_protraction`) | reliable: 5% on candids, 0% on studio photos |
 | Sagittal readings, short-span (`forward_head`, `knee_deviation`) | **weak** — 22–25% on candids; `forward_head` cannot resolve its own thresholds |
 | False-positive guards | 6% leak on the 62-image negative set, against 29% previously |
+| Thresholds | **5 of 6** judged metrics now use measured percentiles, including both sagittal ones |
 | Clinical validity | **none, for any metric** — no image in this project carries a clinical label |
 
 The single most useful thing this repo contains is
@@ -40,7 +41,7 @@ unmeasured.
 
 ```bash
 ./scripts/setup.sh                              # system libs + venv + models + tests
-./.venv/bin/python -m pytest tests/ -q          # 167 passed
+./.venv/bin/python -m pytest tests/ -q          # 175 passed
 ./.venv/bin/python app.py                       # http://127.0.0.1:5000
 ```
 
@@ -141,10 +142,18 @@ These are measured or confirmed, not hypothetical.
    long-span metrics are at 1–5%. On studio photography everything drops to
    0–6%. See [`reports/RELIABILITY.md`](reports/RELIABILITY.md).
 
-2. **Thresholds for every sagittal metric are still guesses.** They are
-   tagged `guess` in `posture/thresholds.py` and shown as such in the UI. The
-   frontal thresholds are derived from a measured distribution and tagged
-   `population-percentile`.
+2. **One threshold is still a guess, and the measured ones rest on n=35.**
+   `head_over_hip` (n=35), `shoulder_protraction` (n=35) and the three frontal
+   metrics (n=95) now use measured percentiles. `trunk_sway` is still `guess`
+   and is *refused* a measured threshold, because its own p90 error (10.3°)
+   exceeds the proposed 80th-percentile cut (7.8°). n=35 clears the n≥20
+   minimum but is not a stable percentile estimate; treat the sagittal cuts as
+   provisional.
+
+   Worth noting how wrong the hand-picked values were: `head_over_hip` was set
+   by hand at 5.0° and measures 14.6° at the 80th percentile,
+   `shoulder_protraction` 8.0° against 10.4°, `shoulder_tilt` 2.0° against
+   6.0°. Every guess was too strict, i.e. would have flagged most people.
 
 3. **No clinical validity, at all.** There is no labelled data in this
    project. The best available calibration is norm-referencing — where your
@@ -227,10 +236,13 @@ subject 730–1029px shoulder-to-ankle.
 redistributable license ids only (4, 5, 7, 8), provenance in each folder's
 `sources.csv`. Candid photography, 250–600px subjects.
 
+The side set grew from 5 to 31 when the miner stopped requiring the feet to
+be in frame — see "How the candidates were found" below.
+
 | folder | n | purpose |
 |---|---|---|
 | `front/` | 33 | frontal metrics |
-| `side/` | 5 | sagittal metrics |
+| `side/` | 31 | sagittal metrics |
 | `negative/` | 14 | COCO images containing no person |
 
 The 62-image negative set is the better false-positive benchmark of the two

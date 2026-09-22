@@ -73,3 +73,49 @@ class TestNearSide:
         side = near_side_indices(side_pose, v.facing)
         assert set(side) == {"ear", "shoulder", "hip", "knee", "ankle", "heel",
                              "foot"}
+
+
+class TestBodyScaleFallback:
+    """body_scale must not measure to an ankle that is not in the picture."""
+
+    def test_uses_shoulder_to_ankle_when_feet_are_in_frame(self, side_pose):
+        from posture.geometry import distance, midpoint
+        sh = midpoint(side_pose.xy(L.LEFT_SHOULDER), side_pose.xy(L.RIGHT_SHOULDER))
+        ank = midpoint(side_pose.xy(L.LEFT_ANKLE), side_pose.xy(L.RIGHT_ANKLE))
+        assert L.body_scale(side_pose) == pytest.approx(distance(sh, ank))
+
+    def test_falls_back_when_an_ankle_is_out_of_frame(self):
+        # MediaPipe extrapolates a confident ankle far below a photo cropped at
+        # the shins. Measuring to it would inflate every normalised quantity,
+        # including the out-of-frame margin that detects the crop.
+        p = make_pose(view="side")
+        for idx in (L.LEFT_ANKLE, L.RIGHT_ANKLE):
+            lm = p.landmarks[idx]
+            p.landmarks[idx] = L.Landmark(lm.x, p.height + 400, lm.z, 1.0, 1.0)
+        from posture.geometry import distance, midpoint
+        sh = midpoint(p.xy(L.LEFT_SHOULDER), p.xy(L.RIGHT_SHOULDER))
+        hip = midpoint(p.xy(L.LEFT_HIP), p.xy(L.RIGHT_HIP))
+        assert L.body_scale(p) == pytest.approx(distance(sh, hip) * 2.6)
+
+    def test_fallback_is_close_to_the_real_span(self):
+        # The 2.6x ratio should land within ~15% of the true shoulder-to-ankle
+        # distance on the synthetic figure, or the fallback would distort every
+        # normalised threshold.
+        p = make_pose(view="side")
+        true_scale = L.body_scale(p)
+        cropped = make_pose(view="side")
+        for idx in (L.LEFT_ANKLE, L.RIGHT_ANKLE):
+            lm = cropped.landmarks[idx]
+            cropped.landmarks[idx] = L.Landmark(lm.x, cropped.height + 400, lm.z, 1.0, 1.0)
+        assert L.body_scale(cropped) == pytest.approx(true_scale, rel=0.15)
+
+    def test_out_of_frame_detection_is_not_circular(self):
+        # out_of_frame_landmarks uses body_scale for its margin, and
+        # body_scale must not consult it back. A cropped pose must still
+        # report its ankles as out of frame.
+        from posture import guards as G
+        p = make_pose(view="side")
+        for idx in (L.LEFT_ANKLE, L.RIGHT_ANKLE):
+            lm = p.landmarks[idx]
+            p.landmarks[idx] = L.Landmark(lm.x, p.height + 400, lm.z, 1.0, 1.0)
+        assert L.LEFT_ANKLE in G.out_of_frame_landmarks(p)
