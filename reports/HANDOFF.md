@@ -230,31 +230,39 @@ measured 80th percentile is 6.0°. The guess would have flagged most people.
 
 ## Open questions
 
-### 1. Is `forward_head` worth keeping at all?
+### 1. (resolved) The metric set was restructured by measurement
 
-This replaces the previous open question ("is the sagittal error rate the tool
-or the images?"), which the Pexels set largely answered: **both, and the
-metric's span decides which dominates.**
+Previously open twice — first as "is the sagittal error rate the tool or the
+images?", then as "should `forward_head` be demoted?". Both are now settled
+and the change is made.
 
-On candid COCO photography `forward_head` is wrong by more than a verdict band
-22% of the time and `knee_deviation` 25%, while the long-span sagittal metrics
-sit at 5%. On studio photography everything except `forward_head` reaches 0%.
-The pattern is consistent and mechanical — `forward_head` measures the
-shortest span in the metric set (ear→shoulder, ~9 cm) using the noisiest
-landmark in it (the shoulder, ~3× the ear's noise).
+**Is it the tool or the images?** Both, and the metric's *span* decides which
+dominates. Short-span metrics degrade badly on candid photography
+(`forward_head` 22%, `knee_deviation` 25%) and recover on studio photography
+(4%); long-span ones are fine on both (5% and 0%).
 
-It already cannot resolve its own thresholds (±11.6° against 10°/18°), so the
-app refuses it a verdict. Meanwhile `head_over_hip` measures the same anatomy
-— where the head sits relative to the body — without the shoulder, over four
-times the span, at ±2.1°, with the best rotation residual of any sagittal
-metric on both sets.
+**What changed.** Which readings may produce a verdict is now decided by the
+measurement, not by which ones have familiar clinical names:
 
-**The open call: promote `head_over_hip` from diagnostic to the primary
-forward-head reading, and either retire `forward_head` or keep it only as a
-diagnostic.** I did not make that change unilaterally because "头前引角" is
-the metric the product promises and renaming it is a product decision. But
-the measurement says the tool currently leads with its worst reading and
-hides its best one.
+- `head_over_hip` promoted to the primary forward-head reading (±1.1°, 5%)
+- `lateral_head_shift` promoted from throwaway diagnostic (±0.9°, 0% — the
+  best-measuring thing in the project)
+- `forward_head` demoted to diagnostic (±2.6°, 22%, cannot resolve its own
+  thresholds). Still computed, because reading it against `head_over_hip`
+  isolates shoulder mislocalisation.
+- `head_tilt`, `head_vs_shoulder_tilt` demoted to diagnostic
+- `knee_deviation` demoted to guard-only
+- every threshold re-set to at least 3× its metric's measured uncertainty
+- the noise model re-based on the studio set (0.0104) rather than the candid
+  set (0.0219), because the intended input is a photograph taken on purpose
+
+Result over 34 photographs: 63 verdicts issued, **63% resolved to a single
+band**, where before the restructure essentially every sagittal verdict came
+back undetermined.
+
+The product-naming objection that held this up ("头前引角 is what the product
+promises") was withdrawn by the repo owner: the goal is judging posture and
+giving advice, not preserving a particular metric name.
 
 ### 2. Side-view data is still short
 

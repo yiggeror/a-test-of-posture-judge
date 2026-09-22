@@ -14,7 +14,7 @@
       "p95": 38.221,
       "abs_p80": 29.294,
       "abs_p95": 38.221,
-      "diagnostic_only": false,
+      "diagnostic_only": true,
       "usable_for_thresholds": false,
       "measurement_p90_error_deg": 9.078,
       "threshold_exceeds_noise": true
@@ -28,7 +28,7 @@
       "p95": 33.433,
       "abs_p80": 22.121,
       "abs_p95": 33.433,
-      "diagnostic_only": true,
+      "diagnostic_only": false,
       "usable_for_thresholds": false,
       "measurement_p90_error_deg": 2.762,
       "threshold_exceeds_noise": true
@@ -42,7 +42,7 @@
       "p95": 12.477,
       "abs_p80": 8.53,
       "abs_p95": 16.654,
-      "diagnostic_only": false,
+      "diagnostic_only": true,
       "usable_for_thresholds": true,
       "measurement_p90_error_deg": 5.068,
       "threshold_exceeds_noise": true
@@ -56,7 +56,7 @@
       "p95": 11.819,
       "abs_p80": 8.408,
       "abs_p95": 13.165,
-      "diagnostic_only": false,
+      "diagnostic_only": true,
       "usable_for_thresholds": true,
       "measurement_p90_error_deg": 5.251,
       "threshold_exceeds_noise": true
@@ -70,7 +70,7 @@
       "p95": 11.792,
       "abs_p80": 10.676,
       "abs_p95": 11.792,
-      "diagnostic_only": false,
+      "diagnostic_only": true,
       "usable_for_thresholds": false,
       "measurement_p90_error_deg": 9.893,
       "threshold_exceeds_noise": true
@@ -84,7 +84,7 @@
       "p95": 7.526,
       "abs_p80": 5.398,
       "abs_p95": 8.982,
-      "diagnostic_only": true,
+      "diagnostic_only": false,
       "usable_for_thresholds": true,
       "measurement_p90_error_deg": 2.089,
       "threshold_exceeds_noise": true

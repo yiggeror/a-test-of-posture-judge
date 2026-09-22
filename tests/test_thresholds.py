@@ -73,18 +73,18 @@ class TestClassification:
 class TestReferenceDistributionLoading:
     def test_missing_file_keeps_defaults_and_tags(self):
         specs = load_thresholds("/nonexistent/reference.json")
-        assert specs["forward_head"].provenance == "guess"
-        assert specs["forward_head"].slight == DEFAULTS["forward_head"].slight
+        assert specs["head_over_hip"].provenance == "guess"
+        assert specs["head_over_hip"].slight == DEFAULTS["head_over_hip"].slight
 
     def test_percentiles_upgrade_provenance(self):
         with tempfile.TemporaryDirectory() as d:
             path = os.path.join(d, "ref.json")
             with open(path, "w") as fh:
                 json.dump({"source": "unit test",
-                           "metrics": {"forward_head": {
+                           "metrics": {"head_over_hip": {
                                "n": 120, "abs_p80": 14.2, "abs_p95": 23.9}}}, fh)
             specs = load_thresholds(path)
-        s = specs["forward_head"]
+        s = specs["head_over_hip"]
         assert s.provenance == "population-percentile"
         assert s.slight == 14.2 and s.notable == 23.9
         assert s.n == 120
@@ -95,12 +95,12 @@ class TestReferenceDistributionLoading:
         with tempfile.TemporaryDirectory() as d:
             path = os.path.join(d, "ref.json")
             with open(path, "w") as fh:
-                json.dump({"metrics": {"forward_head": {
+                json.dump({"metrics": {"head_over_hip": {
                     "n": 9, "abs_p80": 14.2, "abs_p95": 23.9}}}, fh)
             specs = load_thresholds(path)
-        s = specs["forward_head"]
+        s = specs["head_over_hip"]
         assert s.provenance == "guess"
-        assert s.slight == DEFAULTS["forward_head"].slight
+        assert s.slight == DEFAULTS["head_over_hip"].slight
         assert "n=9" in s.basis
 
     def test_percentile_basis_disclaims_clinical_meaning(self):
@@ -119,14 +119,14 @@ class TestReferenceDistributionLoading:
             with open(path, "w") as fh:
                 fh.write("{not json")
             specs = load_thresholds(path)
-        assert specs["forward_head"].provenance == "guess"
+        assert specs["head_over_hip"].provenance == "guess"
 
     def test_loading_does_not_mutate_defaults(self):
-        before = DEFAULTS["forward_head"].slight
+        before = DEFAULTS["head_over_hip"].slight
         with tempfile.TemporaryDirectory() as d:
             path = os.path.join(d, "ref.json")
             with open(path, "w") as fh:
-                json.dump({"metrics": {"forward_head": {
+                json.dump({"metrics": {"head_over_hip": {
                     "n": 99, "abs_p80": 99.0, "abs_p95": 111.0}}}, fh)
             load_thresholds(path)
-        assert DEFAULTS["forward_head"].slight == before
+        assert DEFAULTS["head_over_hip"].slight == before

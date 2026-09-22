@@ -72,45 +72,57 @@ Useful scripts:
 Which metrics are available depends on the camera view, which the tool
 determines itself from the projected shoulder separation.
 
-**Front view**
+**Which metrics carry a verdict was decided by measurement**, not by which
+ones have familiar clinical names. Everything is computed and shown; only the
+readings that survived the reliability work produce a finding.
 
-| metric | meaning |
+**Side view** — reported
+
+| metric | 中文 | ± | meaning |
+|---|---|---|---|
+| `head_over_hip` | 头部前移 | ±1.1° | ear relative to hip — **the primary forward-head reading** |
+| `shoulder_protraction` | 圆肩 | ±1.4° | shoulder relative to hip |
+| `trunk_sway` | 躯干前后倾 | ±2.0° | whole-body forward/backward lean |
+
+**Front view** — reported
+
+| metric | 中文 | ± | meaning |
+|---|---|---|---|
+| `lateral_head_shift` | 头部侧偏 | ±0.9° | head offset from the shoulder midline |
+| `shoulder_tilt` | 高低肩 | ±1.3° | shoulder levelness |
+| `pelvis_tilt` | 骨盆侧倾 | ±3.5° | lateral pelvic obliquity (often comes back unresolved) |
+
+**Diagnostic only** — measured and shown, never a verdict
+
+| metric | why |
 |---|---|
-| `shoulder_tilt` | shoulder levelness |
-| `pelvis_tilt` | lateral pelvic obliquity |
-| `head_tilt` | head side-tilt |
-| `head_vs_shoulder_tilt` | head tilt relative to the shoulders — **camera roll cancels in this one** |
-| `lateral_head_shift` | diagnostic only, no verdict |
+| `forward_head` | ±2.6°, 22% gross error. Kept because reading it against `head_over_hip` isolates shoulder mislocalisation |
+| `head_tilt` | 64px span, the shortest in the set |
+| `head_vs_shoulder_tilt` | camera roll cancels in it, but it inherits `head_tilt`'s noise |
+| `knee_deviation` | 25% gross error; used as a **neutrality guard**, not a finding |
 
-**Side view**
+Every reading is `value ± uncertainty`, propagated from measured per-landmark
+noise through the specific segment. When the error bar crosses a threshold the
+band is reported as undetermined; when it is as wide as a whole band the tool
+says 测量精度不足以判定 and offers no advice.
 
-| metric | meaning |
-|---|---|
-| `forward_head` | ear relative to shoulder |
-| `shoulder_protraction` | shoulder relative to hip ("rounded shoulders") |
-| `trunk_sway` | whole-body forward/backward lean |
-| `knee_deviation` | + flexed / − hyperextended |
-| `head_over_hip` | diagnostic only — ear relative to hip, **does not use the shoulder landmark, and is the most precise sagittal reading at ±2.1° against `forward_head`'s ±11.6°** |
+### Three design changes, each forced by a measurement
 
-Every reading is reported as `value ± uncertainty`. The uncertainty is not a
-decoration: it is propagated from the measured landmark noise through the
-specific segment being measured, and when it crosses a threshold the tool
-reports the band as undetermined instead of picking a side.
+**"头前引角" is no longer the headline reading.** Measured the obvious way
+(ear vs shoulder) it is the *worst* thing this tool produces: shortest span in
+the set, measured with its noisiest landmark, ±2.6° against 10°/18°
+thresholds, 22% gross error. `head_over_hip` measures the same anatomy —
+where the head sits relative to the body — without the shoulder and over four
+times the span, at ±1.1°. It is now primary; `forward_head` is diagnostic.
 
-### Two deliberate design changes from the original metric set
+**`lateral_head_shift` was promoted.** It started as a throwaway diagnostic
+and turned out to measure best of anything here (±0.9°, 0% gross error).
 
-**"Pelvic tilt" was removed.** Anterior/posterior pelvic tilt is defined
-clinically by the ASIS–PSIS line. BlazePose emits one approximate hip-*joint*
-centre per side and no pelvic landmarks at all, so any number shipped under
-that name would have been a rescaled hip position wearing a clinical label.
-`trunk_sway` replaces it and measures what the landmarks can actually support.
-`pelvis_tilt` in the table above is *lateral* obliquity only, and is named so.
-
-**`head_over_hip` was added.** The original set's forward-head and
-rounded-shoulder metrics are not independent — they share the shoulder
-landmark, with opposite sign, so a mislocated shoulder pushes one up and the
-other down. `head_over_hip` skips the shoulder entirely, so when the two
-disagree it tells you which landmark is responsible.
+**Anterior/posterior pelvic tilt is absent, deliberately.** It is defined
+clinically by the ASIS–PSIS line and BlazePose emits neither landmark, only an
+approximate hip-*joint* centre per side. A number under that name would have
+been a rescaled hip position wearing a clinical label. `pelvis_tilt` above is
+*lateral* obliquity only and is named so.
 
 ---
 

@@ -79,84 +79,114 @@ class ThresholdSpec:
 # These apply when reports/reference_distribution.json is absent. Read the
 # provenance on each one before trusting any verdict built from it.
 
+# Which metrics carry a verdict was decided by MEASUREMENT, not by which ones
+# have familiar clinical names. See reports/RELIABILITY.md. The ranking that
+# drove it, on the COCO set (gross error = residual over 5 deg after a known
+# rotation is removed):
+#
+#   lateral_head_shift    +/-0.9   0%     -> verdict
+#   head_over_hip         +/-1.1   5%     -> verdict
+#   shoulder_tilt         +/-1.3   1%     -> verdict
+#   shoulder_protraction  +/-1.4   5%     -> verdict
+#   trunk_sway            +/-2.0  13%     -> verdict
+#   pelvis_tilt           +/-3.5   3%     -> verdict (often unresolved, below)
+#   forward_head          +/-2.6  22%     -> diagnostic only
+#   head_tilt             +/-3.4  10%     -> diagnostic only
+#   head_vs_shoulder_tilt +/-3.7  13%     -> diagnostic only
+#   knee_deviation        +/-3.8  25%     -> guard only
+#
+# Each cut point below is at least 3x the metric's measured uncertainty, so a
+# reading can actually land in a band rather than straddling it. That is a
+# necessary condition for a threshold to mean anything, not a sufficient one:
+# these are still not clinical cutoffs.
+
 DEFAULTS: dict[str, ThresholdSpec] = {
-    "forward_head": ThresholdSpec(
-        key="forward_head", label_zh="头部前引",
-        slight=10.0, notable=18.0, direction="positive_only",
+    # --- sagittal (side view) ---
+    "head_over_hip": ThresholdSpec(
+        key="head_over_hip", label_zh="头部前移",
+        slight=5.0, notable=10.0, direction="positive_only",
         provenance="guess",
-        basis="Published cutoffs exist for the craniovertebral angle (roughly "
-              "CVA < 48-50 deg indicates forward head posture), but CVA is "
-              "measured from the C7 spinous process and this metric is measured "
-              "from the acromion, which sits several centimetres anterior. The "
-              "offset between the two has not been characterised here, so "
-              "converting the published cutoff would be inventing a mapping. "
-              "These numbers are placeholders chosen by hand.",
+        basis="How far the ear sits in front of the hip, as an angle from "
+              "vertical. This is the tool's primary forward-head reading "
+              "because it is the most precise one it has (+/-1.1 deg, 5% gross "
+              "error), not because a published cutoff exists in this geometry "
+              "-- none does. It deliberately skips the shoulder, which is the "
+              "noisiest landmark in the set. At a ~1.0 m hip-to-ear distance, "
+              "5 deg is about 9 cm of forward head carriage and 10 deg about "
+              "18 cm. Those are hand-picked, but both are comfortably above "
+              "the 3x-uncertainty floor. Both cut points are chosen by hand.",
     ),
     "shoulder_protraction": ThresholdSpec(
         key="shoulder_protraction", label_zh="圆肩（肩前移）",
-        slight=6.0, notable=12.0, direction="positive_only",
+        slight=8.0, notable=15.0, direction="positive_only",
         provenance="guess",
-        basis="No published cutoff is expressed in this geometry (acromion "
-              "displacement from the hip, as an angle from vertical). Chosen by "
-              "hand.",
+        basis="Acromion displacement from the hip, as an angle from vertical. "
+              "No published cutoff is expressed in this geometry. Raised from "
+              "an earlier hand-picked 6/12 so that the lower cut clears 3x the "
+              "measured uncertainty (+/-1.4 deg). Still chosen by hand.",
     ),
     "trunk_sway": ThresholdSpec(
         key="trunk_sway", label_zh="躯干前后倾",
-        slight=4.0, notable=8.0, direction="symmetric",
+        slight=6.0, notable=10.0, direction="symmetric",
         provenance="guess",
-        basis="Quiet-stance sway in healthy adults is well under a degree, so "
-              "a sustained multi-degree lean in a still photograph is a real "
-              "postural offset rather than sway. Where the notable/slight line "
-              "belongs is still a hand-picked choice.",
+        basis="Whole-body forward/backward lean, hip relative to ankle. Quiet "
+              "standing sway is well under a degree, so a multi-degree lean in "
+              "a still photograph is a real offset. The usable range is narrow: "
+              "the neutrality guard rejects the photo entirely above 12 deg, so "
+              "the whole scale lives between the 3x-uncertainty floor (~6 deg) "
+              "and that ceiling. Two bands is all this metric can support, and where the line between them falls is chosen by hand.",
     ),
-    "knee_deviation": ThresholdSpec(
-        key="knee_deviation", label_zh="膝关节角度",
-        slight=6.0, notable=12.0, direction="symmetric",
-        provenance="guess",
-        basis="Genu recurvatum is commonly described from about 5-10 deg of "
-              "hyperextension, but that is a goniometric measurement at the "
-              "joint, not a three-landmark projection from a photograph. "
-              "Chosen by hand.",
-    ),
+    # --- frontal (front view) ---
     "shoulder_tilt": ThresholdSpec(
         key="shoulder_tilt", label_zh="高低肩",
-        slight=2.0, notable=4.0, direction="symmetric",
+        slight=6.0, notable=12.0, direction="symmetric",
         provenance="guess",
-        basis="Camera roll adds directly to this reading and is typically a "
-              "degree or two in handheld photographs, which is the same size "
-              "as the effect being measured. Any cut point below a few degrees "
-              "is mostly measuring the photographer.",
+        basis="Camera roll adds directly to this reading and cannot be "
+              "separated from a real shoulder difference in a single "
+              "uncalibrated photo. Replaced by measured percentiles when the "
+              "reference distribution has enough samples; until then these are chosen by hand.",
     ),
     "pelvis_tilt": ThresholdSpec(
         key="pelvis_tilt", label_zh="骨盆侧倾",
-        slight=2.0, notable=4.0, direction="symmetric",
+        slight=7.0, notable=12.0, direction="symmetric",
         provenance="guess",
-        basis="Lateral pelvic obliquity carries the same camera-roll confound "
-              "as shoulder_tilt: a degree or two of handheld camera roll adds "
-              "directly to the reading and is the same size as the effect "
-              "being measured. Standing with the weight on one leg also "
-              "produces several degrees of it, which is a stance rather than a "
-              "postural trait. Chosen by hand.",
+        basis="Lateral pelvic obliquity only -- NOT anterior/posterior pelvic "
+              "tilt, which these landmarks cannot measure. Measured across the "
+              "hips, a narrower span than the shoulders, so it is the least "
+              "precise frontal reading (+/-3.5 deg) and frequently comes back "
+              "unresolved. Same camera-roll confound as shoulder_tilt, plus "
+              "standing on one leg produces several degrees of it. Chosen by hand.",
     ),
-    "head_tilt": ThresholdSpec(
-        key="head_tilt", label_zh="头部侧倾",
-        slight=3.0, notable=6.0, direction="symmetric",
+    "lateral_head_shift": ThresholdSpec(
+        key="lateral_head_shift", label_zh="头部侧偏",
+        slight=5.0, notable=9.0, direction="symmetric",
         provenance="guess",
-        basis="Measured across the eyes, the shortest span of any metric here, "
-              "so the noisiest. Chosen by hand.",
-    ),
-    "head_vs_shoulder_tilt": ThresholdSpec(
-        key="head_vs_shoulder_tilt", label_zh="头肩相对侧倾",
-        slight=3.0, notable=6.0, direction="symmetric",
-        provenance="guess",
-        basis="Camera roll cancels in this difference, so unlike head_tilt and "
-              "shoulder_tilt it is not confounded by camera levelness. The cut "
-              "points are still hand-picked.",
+        basis="Horizontal offset of the head from the shoulder midline, as an "
+              "angle subtended at the hips. Promoted from diagnostic to a "
+              "verdict metric because it measures best of anything here "
+              "(+/-0.9 deg, 0% gross error) -- it uses a long span and avoids "
+              "the eye landmarks. CAVEAT: a subject turned slightly away from "
+              "the camera shifts the nose off the shoulder midline without any "
+              "real head shift, and the front-view gate admits up to about 30 "
+              "deg of torso yaw, so some of this reading can be stance. The cut points are chosen by hand.",
     ),
 }
 
-# Diagnostic metrics are measured and displayed but never produce a verdict.
-DIAGNOSTIC_ONLY = {"head_over_hip", "lateral_head_shift"}
+# Measured and displayed, but never turned into a verdict.
+#
+#   forward_head           +/-2.6 deg against 10/18 thresholds: cannot resolve
+#                          its own bands. Kept because comparing it with
+#                          head_over_hip identifies shoulder mislocalisation --
+#                          they share the shoulder with opposite sign.
+#   head_tilt              measured across the eyes, a 64px span, the shortest
+#                          in the set.
+#   head_vs_shoulder_tilt  camera roll cancels in it, which is genuinely
+#                          useful, but it inherits head_tilt's noise.
+#   knee_deviation         25% gross error. Used as a NEUTRALITY GUARD (a bent
+#                          knee invalidates the other readings), never reported
+#                          as a postural finding.
+DIAGNOSTIC_ONLY = {"forward_head", "head_tilt", "head_vs_shoulder_tilt",
+                   "knee_deviation"}
 
 
 def load_thresholds(path: str | None = None) -> dict[str, ThresholdSpec]:

@@ -255,7 +255,57 @@ photos are blocked.
 
 ---
 
-## 7. What the app does about all this
+## 7. What the metric set was changed to, and why
+
+The measurements above were then used to decide which readings are allowed to
+produce a finding. The ranking, and the decision it forced:
+
+| metric | ± | gross | role |
+|---|---|---|---|
+| `lateral_head_shift` | ±0.9° | 0% | **promoted** diagnostic → verdict |
+| `head_over_hip` | ±1.1° | 5% | **promoted** diagnostic → primary forward-head reading |
+| `shoulder_tilt` | ±1.3° | 1% | verdict |
+| `shoulder_protraction` | ±1.4° | 5% | verdict |
+| `trunk_sway` | ±2.0° | 13% | verdict, two bands only |
+| `pelvis_tilt` | ±3.5° | 3% | verdict, but usually unresolved |
+| `forward_head` | ±2.6° | 22% | **demoted** verdict → diagnostic |
+| `head_tilt` | ±3.4° | 10% | **demoted** verdict → diagnostic |
+| `head_vs_shoulder_tilt` | ±3.7° | 13% | **demoted** verdict → diagnostic |
+| `knee_deviation` | ±3.8° | 25% | **demoted** verdict → guard only |
+
+Two of these reverse what the metric names suggest, which is the point:
+
+- **「头前引角」 measured the obvious way is the worst reading the tool has.**
+  It led the output. It now produces no verdict at all, and `head_over_hip` —
+  the same anatomy, without the shoulder, over four times the span — leads
+  instead.
+- **`lateral_head_shift` was nearly thrown away** and measures best of
+  anything here.
+
+Every threshold is now at least 3× its metric's measured uncertainty, which
+is a necessary condition for a band to be reachable at all. `trunk_sway` only
+supports two bands: its 3×-uncertainty floor is ~6° and the neutrality guard
+rejects the photo above 12°, so the whole scale lives in between.
+
+**The noise model was also re-based.** It now comes from the studio set
+(0.0104 of body height) rather than the COCO candid set (0.0219), because the
+tool's intended input is a photograph taken on purpose. Using candid noise
+made almost every reading "undetermined" — technically defensible, useless in
+practice. The `subject_too_small` and `unstable_landmarks` guards cover the
+case where a user uploads something closer to a candid.
+
+Effect, measured over 34 photographs from both sets: 21 accepted, 63 verdicts
+issued, **63% of them resolved** to a single band. Before the restructure
+essentially every sagittal verdict came back undetermined.
+
+`pelvis_tilt` is the one metric that still almost never resolves: its ±3.5°
+exceeds its own 3.0°-wide middle band, because the hips are a narrower span
+than the shoulders. It is left in place rather than demoted, so that it
+recovers automatically if the noise floor improves.
+
+---
+
+## 8. What the app does about all this
 
 - Every reading shows `value ± uncertainty`, propagated per landmark.
 - An error bar crossing a threshold → band reported as undetermined.
@@ -263,8 +313,8 @@ photos are blocked.
   advice. Fires for `forward_head`, `trunk_sway`, `knee_deviation`.
 - Subject under 430px shoulder-to-ankle → warning, with the measured
   justification.
-- Frontal thresholds from a measured distribution; sagittal ones still tagged
-  `guess`.
+- Frontal thresholds from a measured distribution (n=91); sagittal ones
+  still tagged `guess`, because the side-view reference set is only n=11.
 
 Readings with real signal still resolve: `shoulder_protraction +37.5 ±3.5`
 reports 明显倾向 with no hedging.

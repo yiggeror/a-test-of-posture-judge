@@ -1,15 +1,30 @@
 """Posture measurements and their uncertainties.
 
-Design note -- what changed from the original four-metric set
-------------------------------------------------------------
-The original design carried a "pelvic tilt" metric. It is not implemented here,
-because it is not measurable from these landmarks. Anterior/posterior pelvic
-tilt is defined clinically by the ASIS-PSIS line; BlazePose emits a single
-approximate hip-JOINT centre per side and no pelvic landmarks at all. Any
-number reported under that name would have been a re-scaled hip-position
-reading wearing a clinical label. It is replaced by `trunk_sway`, which is
-what the hip landmark can actually support, and the gap is stated in the
-README rather than papered over.
+Which metrics carry a verdict was decided by measurement
+--------------------------------------------------------
+Not by which ones have familiar clinical names. Everything here is computed
+and displayed; `thresholds.DIAGNOSTIC_ONLY` decides which ones are allowed to
+produce a finding, and that list came out of reports/RELIABILITY.md.
+
+Two consequences worth stating plainly, because both reverse what the metric
+names would suggest:
+
+  * "头前引角" measured the obvious way (ear vs shoulder, `forward_head`) is
+    the WORST reading this tool produces -- shortest span, noisiest landmark,
+    22% gross error, unable to resolve its own thresholds. It is diagnostic
+    only. `head_over_hip` measures the same anatomy (where the head sits
+    relative to the body) without the shoulder and over four times the span,
+    and is the primary forward-head reading instead.
+
+  * `lateral_head_shift` started as a throwaway diagnostic and measures best
+    of anything here (+/-0.9 deg, 0% gross error), so it is now a verdict
+    metric.
+
+Anterior/posterior pelvic tilt is absent entirely, and that is deliberate: it
+is defined clinically by the ASIS-PSIS line and BlazePose emits neither
+landmark, only an approximate hip-JOINT centre per side. A number under that
+name would have been a rescaled hip position wearing a clinical label.
+`pelvis_tilt` here is LATERAL obliquity only and is named so.
 
 Metric independence
 -------------------
@@ -17,9 +32,10 @@ Metric independence
 share the shoulder landmark, and share it with opposite sign: a shoulder
 placed too far anterior *decreases* forward_head and *increases*
 shoulder_protraction. They are therefore negatively coupled through their own
-measurement error, not just through real anatomy. `head_over_hip` is reported
-alongside them precisely because it skips the shoulder entirely, so when the
-two disagree it identifies which landmark is responsible.
+measurement error, not just through real anatomy. `head_over_hip` skips the
+shoulder entirely, so reading it against `forward_head` identifies which
+landmark is responsible when the two disagree. That is what `forward_head` is
+still computed for.
 
 Uncertainty
 -----------
@@ -171,10 +187,13 @@ def compute_sagittal(pose: L.PoseResult, view: ViewEstimate,
         uncertainty=_angle_sigma(sig(side["shoulder"]), sig(side["ear"]), span),
         plane="sagittal", span_px=span,
         landmark_indices=(side["shoulder"], side["ear"]),
-        note="Proxy for forward head posture. NOT the clinical craniovertebral "
-             "angle: CVA is measured from the C7 spinous process, which these "
-             "landmarks do not include. The acromion sits anterior to C7, so "
-             "this reading is systematically smaller than (90 - CVA).",
+        note="DIAGNOSTIC ONLY -- no verdict is issued from this reading. It "
+             "spans the shortest distance in the metric set (ear-to-shoulder, "
+             "~9 cm) using its noisiest landmark (the shoulder), which leaves "
+             "it unable to resolve its own thresholds. Use `head_over_hip` for "
+             "head position; read this one against it to spot a mislocated "
+             "shoulder. Also NOT the clinical craniovertebral angle: CVA is "
+             "measured from C7, which these landmarks do not include.",
     )
 
     span = distance(hip, sh)
@@ -209,8 +228,11 @@ def compute_sagittal(pose: L.PoseResult, view: ViewEstimate,
         uncertainty=_angle_sigma(sig(side["hip"]), sig(side["ear"]), span),
         plane="sagittal", span_px=span,
         landmark_indices=(side["hip"], side["ear"]),
-        note="Diagnostic. Does not use the shoulder landmark, so it separates "
-             "genuine head position from shoulder mislocalisation.",
+        note="The tool's PRIMARY forward-head reading. Does not use the "
+             "shoulder landmark, and spans hip-to-ear rather than "
+             "shoulder-to-ear, which makes it about five times more precise "
+             "than `forward_head` measures the same anatomy at. Comparing the "
+             "two also isolates shoulder mislocalisation.",
     )
 
     # Knee: signed deviation from a straight leg. The interior angle alone is
@@ -235,8 +257,9 @@ def compute_sagittal(pose: L.PoseResult, view: ViewEstimate,
             uncertainty=_angle_sigma(sig(side["knee"]), sig(side["knee"]), span),
             plane="sagittal", span_px=span,
             landmark_indices=(side["hip"], side["knee"], side["ankle"]),
-            note="Also used as a guard: a flexed knee means the subject was "
-                 "not standing neutrally, which invalidates the other readings.",
+            note="GUARD ONLY -- never reported as a postural finding. A flexed "
+                 "knee means the subject was not standing neutrally, which "
+                 "invalidates every other reading.",
         )
     return out
 
@@ -313,8 +336,11 @@ def compute_frontal(pose: L.PoseResult,
             uncertainty=_angle_sigma(sig(L.NOSE), sig(L.LEFT_SHOULDER), span),
             plane="frontal", span_px=span,
             landmark_indices=(L.NOSE, L.LEFT_SHOULDER, L.RIGHT_SHOULDER),
-            note="Diagnostic. Positive means the head sits to the viewer's "
-                 "right of the shoulder midline.",
+            note="Head position relative to the shoulder midline. Positive "
+                 "means the head sits to the viewer's right. The most precise "
+                 "reading the tool produces. Caveat: a subject turned slightly "
+                 "away from the camera shifts the nose off the midline with no "
+                 "real head shift.",
         )
 
     # Roll-invariant combination: if the camera is rolled by r degrees, both
