@@ -13,7 +13,7 @@ before believing any number it produces.
 
 | | |
 |---|---|
-| Code | working end to end, 175 tests |
+| Code | working end to end, 186 tests |
 | Rotation tracking, all 9 metrics | **within 0.05 of theory** on two independent image sets |
 | Response to a **real** posture change | slope **1.007** / **0.984** — does not under-report actual deviation |
 | Frontal readings | reliable: 1–3% gross error, thresholds from a measured distribution |
@@ -41,9 +41,17 @@ unmeasured.
 
 ```bash
 ./scripts/setup.sh                              # system libs + venv + models + tests
-./.venv/bin/python -m pytest tests/ -q          # 175 passed
-./.venv/bin/python app.py                       # http://127.0.0.1:5000
+./.venv/bin/python -m pytest tests/ -q          # 186 passed
+./.venv/bin/python app.py                       # HTML page, http://127.0.0.1:5000
+./.venv/bin/python api.py                       # JSON API,  http://127.0.0.1:5001
 ```
+
+Building a mini-program or mobile client? Read
+[`reports/DEPLOYMENT.md`](reports/DEPLOYMENT.md) first — it has the measured
+model sizes and timings, the on-device vs server trade-off, and the one
+binding constraint that decides it (every threshold and uncertainty here is
+tied to BlazePose's 33-point topology; swapping the pose model invalidates all
+of them).
 
 `setup.sh` installs `libegl1 libgles2 libgl1`. That is not optional on a
 headless box: the mediapipe wheel links against EGL/GLES even for CPU-only
@@ -291,7 +299,8 @@ Excluded by policy, not oversight: **YOLO-pose** (AGPL-3.0) and **OpenPose**
 ## Layout
 
 ```
-app.py                 Flask single-page app
+app.py                 Flask single-page app (HTML)
+api.py                 JSON API for mini-program / mobile clients
 posture/
   geometry.py          pure angle maths, no vision deps, exactly testable
   landmarks.py         MediaPipe Tasks wrapper (the mp.solutions.* API is gone in 1.0.x)
@@ -312,6 +321,7 @@ scripts/
   reference_distribution.py  norm-reference percentiles for thresholds
 reports/
   RELIABILITY.md             what the numbers are worth  <- read this
+  DEPLOYMENT.md              mini-program / on-device constraints
   synthetic_warp.json        known-posture-change results
   HANDOFF.md                 state and next steps
   repeatability.json         raw measurements
