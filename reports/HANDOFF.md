@@ -26,14 +26,22 @@ before the branch surfaced. What changed afterwards is documented below under
 "What the previous phase's work then contributed" — it was not wasted; it
 supplied the test set that overturned this phase's headline result.
 
-### A branch-naming conflict worth knowing about
+### Where the work ended up
 
-The previous handoff says "所有开发和推送都在 `...-demo-q1x8nj` 这个分支上，
-不要推别的分支". This session was instructed by its own harness to develop on
-`claude/posture-assessment-reliability-2jazt2`. I followed the harness and did
-not touch the other branch. The two branches have therefore diverged from
-`7130ed2` and **nobody has merged them**. That is a decision for the repo
-owner, not something this session should have resolved unilaterally.
+The repo owner resolved the branch question: this work is now on **`main`**.
+
+| branch | state |
+|---|---|
+| `main` | the deliverable |
+| `claude/posture-assessment-reliability-2jazt2` | identical to main; development history |
+| `claude/posture-assessment-demo-q1x8nj` | the previous phase, **left untouched** |
+
+The previous phase's branch was copied from, not modified: its 74 images and
+`sources_full.csv` were brought over to `testdata/pexels/`, its `PHASE0/2/3.md`
+were deliberately left where they are (they are that phase's experiment log and
+moving them would confuse authorship), and its code was superseded rather than
+merged — the implementations are different enough that a merge would have been
+a rewrite with extra steps.
 
 ## What is different about this environment
 
@@ -264,22 +272,39 @@ The product-naming objection that held this up ("头前引角 is what the produc
 promises") was withdrawn by the repo owner: the goal is judging posture and
 giving advice, not preserving a particular metric name.
 
-### 2. Side-view data is still short
+### 2. Side-view photographs: searched properly, and they are not there
 
-47 candidates, ~35 classified as side views, 9 passing all guards. Percentile
-thresholds need n≥20 and ideally n≥100. Untried avenues:
+47 COCO candidates, ~35 classified side, 9 passing all guards, plus 2 studio
+side views from the previous phase. Percentile thresholds need n≥20 and
+ideally n≥100, so the three sagittal thresholds are still `guess`.
 
-- **Relax the mining predicates.** `multiple_people` (27,934) and
-  `incomplete_annotation` (24,482) are the biggest rejection buckets and both
-  are conservative.
-- **Other annotated corpora.** MPII Human Pose ships activity labels
-  including standing categories; licensing needs checking before any image is
-  committed.
-- **Synthetic rendering.** Still never tried, and it is the only route to
-  *true* ground truth on absolute angles rather than on deltas. Licensing of
-  the body model matters: SMPL/SMPL-X are research-only.
-- **Ask the user to photograph themselves.** Also the only route to real
-  test-retest repeatability (below).
+**This was re-examined rather than assumed.** Four sources, all actually
+tested:
+
+| source | result |
+|---|---|
+| Pexels (previous phase) | ~1400 images inspected, ~0.1% hit rate |
+| Wikimedia Commons | `Category:Human postures` DOES exist — the previous phase searched the singular. But its contents are paintings, sculpture, sport and 19th-century Bertillon criminal-record photographs; `Category:Anthropometry` is craniometry. Free-text file search returns menhirs, cicadas and birds. **Content type does not match; the 0 hits were not a method error.** |
+| COCO | 268k annotated instances → 47 side candidates. Used. |
+| DeepFashion (13.7k e-commerce model photos, HF) | 100 sampled → **0 side views, 100% blocked for feet out of frame.** Fashion photography crops at the knee. Also research-only licensing. |
+
+`scripts/commons_explore.py` is committed so the Commons search is repeatable
+rather than a claim. The conclusion is that this framing — full body including
+feet, true lateral, ear unobstructed, arms hanging free — is genuinely rare in
+public image collections, and no better search fixes it.
+
+Still untried: MPII Human Pose (25k images, but the HuggingFace mirror ships
+images only; the original annotations with activity labels would need fetching
+from the MPII site, which is reachable), and asking a user to photograph
+themselves.
+
+**What was done instead, and it worked:** `scripts/synthetic_warp.py` turns
+each side-view photograph into 8 ground-truth test cases by applying a known
+geometric shear. 38 images became 284 comparisons — a 25× expansion of the
+sagittal evidence base without a single new photograph. It does not solve the
+threshold problem (a warped photo tells you nothing about what value is
+*typical* in a population) but it solved the accuracy problem, which was the
+more important of the two. See RELIABILITY.md section 4.
 
 ### 3. Real repeatability is still unmeasured
 
@@ -328,7 +353,7 @@ than two independent ones is an open design call.
 
 ```bash
 ./scripts/setup.sh                                    # libs + venv + models + tests
-./.venv/bin/python -m pytest tests/ -q                # 152 passed
+./.venv/bin/python -m pytest tests/ -q                # 167 passed
 ./.venv/bin/python app.py                             # http://127.0.0.1:5000
 ./.venv/bin/python scripts/validate.py --dir testdata/front --save-overlays
 ./.venv/bin/python scripts/repeatability.py --dir testdata/front testdata/side

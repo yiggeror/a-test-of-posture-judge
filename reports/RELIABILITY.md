@@ -148,14 +148,68 @@ drive it:
 
 - **Span.** `forward_head` (22% gross) and `knee_deviation` (25%) are the two
   shortest-span measurements. `head_over_hip` and `shoulder_protraction`,
-  which measure over 3–4× the span, sit at 5%. See section 5.
+  which measure over 3–4× the span, sit at 5%. See section 6.
 - **Image quality.** Every metric improves on studio photography, and the
   short-span ones improve most: `forward_head` 22% → 4%, `trunk_sway`
   13% → 0%.
 
 ---
 
-## 4. Mirror
+## 4. Response to a known posture change
+
+The rotation test moves the camera's idea of "down". It cannot answer the
+question a posture tool actually lives or dies on:
+
+> if a person's head really is 10° further forward, does the reading move by
+> 10°, or by 6°?
+
+A systematic under-response would pass every test in section 3 and still make
+every verdict too lenient. `scripts/synthetic_warp.py` answers it by deforming
+the photograph instead of the camera: a horizontal shear whose magnitude ramps
+from zero at the hips to `d` pixels at the ears, which is geometrically what
+forward head carriage looks like — pelvis fixed, neck and head translating
+forward, shoulders coming partway.
+
+The ground truth is exact and needs no labelling. Every landmark's true new
+position is `(x + d·ramp(y), y)`, so the true new value of every metric is
+computable from the baseline landmarks. 38 side-view images × 8 known shifts
+(±2% to +10% of body height) gives 284 comparisons per metric.
+
+| metric | n | LS slope | robust slope | RMS residual | max |
+|---|---|---|---|---|---|
+| `head_over_hip` | 284 | **1.007** | 0.972 | 2.19° | 20.90° |
+| `shoulder_protraction` | 284 | **0.984** | 0.964 | 2.54° | 20.83° |
+| `forward_head` | 280 | 1.071 | 1.005 | 5.19° | 34.82° |
+
+**The tool does not systematically under-report real postural deviation.** All
+three slopes sit within 7% of 1.000, and the two long-span metrics within 4%.
+A head that really has moved forward by 10° reads as about 10°.
+
+This is the project's only accuracy result. Note carefully what kind it is:
+
+- It is accuracy with respect to a **delta**, not an absolute. It shows a known
+  change of N degrees reads as N degrees. It says nothing about whether the
+  baseline photograph's absolute reading was correct — that still needs a
+  reference measurement on a real body.
+- The shear is a plausible-looking approximation of forward head carriage, not
+  a biomechanical simulation. Real forward head posture also changes the
+  cervical curve and the chin's position relative to the skull; a shear does
+  not reproduce either.
+- `forward_head` again carries more than twice the residual of `head_over_hip`,
+  consistent with everything else measured here.
+
+The residual spread (RMS ~2.2°, max ~21°) is the same heavy-tailed behaviour
+section 3 found, and from the same source: these are mostly candid COCO
+photographs, where detection occasionally fails outright.
+
+**Why this matters beyond the result.** It turns one good photograph into
+eight ground-truth test cases. The side-view reference set is n=11 and no
+amount of searching fixed that (see README, "Test data"); this harness gets
+284 comparisons out of 38 images without needing a single new photograph.
+
+---
+
+## 5. Mirror
 
 Frontal readings must negate exactly; sagittal readings must be preserved.
 COCO set.
@@ -179,7 +233,7 @@ warns about it; it does not block.
 
 ---
 
-## 5. Landmark noise, and where the imprecision comes from
+## 6. Landmark noise, and where the imprecision comes from
 
 RMS displacement as a fraction of shoulder-to-ankle height.
 **COCO 0.0219, Pexels 0.0104** — studio photography halves it.
@@ -221,7 +275,7 @@ rotation residual of any sagittal metric on both sets.
 
 ---
 
-## 6. False-positive guards
+## 7. False-positive guards
 
 Benchmarked on the previous phase's 62-image negative set (statues,
 mannequins, dolls, hand and foot close-ups, bending, sitting, animals,
@@ -255,7 +309,7 @@ photos are blocked.
 
 ---
 
-## 7. What the metric set was changed to, and why
+## 8. What the metric set was changed to, and why
 
 The measurements above were then used to decide which readings are allowed to
 produce a finding. The ranking, and the decision it forced:
@@ -305,7 +359,7 @@ recovers automatically if the noise floor improves.
 
 ---
 
-## 8. What the app does about all this
+## 9. What the app does about all this
 
 - Every reading shows `value ± uncertainty`, propagated per landmark.
 - An error bar crossing a threshold → band reported as undetermined.
@@ -328,9 +382,11 @@ Real test-retest — the subject re-standing, the photographer re-framing,
 clothing shifting — is strictly larger and remains unmeasured. It needs
 someone to photograph the same person several times.
 
-**No accuracy, for any metric.** Precision is not accuracy. A reading can be
-perfectly repeatable and consistently wrong. Detecting that needs a reference
-measurement on a real body, which this project has never had.
+**Accuracy only for deltas, never for absolutes.** Section 4 shows a known
+*change* of N degrees reads as N degrees. It cannot show that the baseline
+reading was right to begin with: a metric can track every change perfectly and
+still be offset by a constant. Detecting that needs a reference measurement on
+a real body, which this project has never had.
 
 **No clinical meaning.** No image carries a clinical label. Percentile
 thresholds say where a reading sits among other photographs of unscreened

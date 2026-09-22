@@ -13,8 +13,9 @@ before believing any number it produces.
 
 | | |
 |---|---|
-| Code | working end to end, 154 tests |
+| Code | working end to end, 167 tests |
 | Rotation tracking, all 9 metrics | **within 0.05 of theory** on two independent image sets |
+| Response to a **real** posture change | slope **1.007** / **0.984** — does not under-report actual deviation |
 | Frontal readings | reliable: 1–3% gross error, thresholds from a measured distribution |
 | Sagittal readings, long-span (`head_over_hip`, `shoulder_protraction`) | reliable: 5% on candids, 0% on studio photos |
 | Sagittal readings, short-span (`forward_head`, `knee_deviation`) | **weak** — 22–25% on candids; `forward_head` cannot resolve its own thresholds |
@@ -39,7 +40,7 @@ unmeasured.
 
 ```bash
 ./scripts/setup.sh                              # system libs + venv + models + tests
-./.venv/bin/python -m pytest tests/ -q          # 152 passed
+./.venv/bin/python -m pytest tests/ -q          # 167 passed
 ./.venv/bin/python app.py                       # http://127.0.0.1:5000
 ```
 
@@ -59,6 +60,9 @@ Useful scripts:
 
 # rebuild the norm-reference distribution the thresholds come from
 ./.venv/bin/python scripts/reference_distribution.py --dirs testdata/front testdata/side
+
+# measure the response to a KNOWN posture change (accuracy of a delta)
+./.venv/bin/python scripts/synthetic_warp.py --dir testdata/pexels/side
 
 # find more candidate photos (see "Test data" below)
 ./.venv/bin/python scripts/coco_mine.py --ann-dir <coco-annotations> --view side --out cand.csv
@@ -290,10 +294,13 @@ scripts/
   coco_mine.py               find candidates by annotation, not by eye
   fetch_from_manifest.py     download with provenance recording
   validate.py                pipeline over a folder + acceptance statistics
-  repeatability.py           the reliability measurement
+  repeatability.py           precision: readings under transforms that change nothing
+  synthetic_warp.py          accuracy: readings under a KNOWN posture change
+  commons_explore.py         Wikimedia Commons candidate search (see Test data)
   reference_distribution.py  norm-reference percentiles for thresholds
 reports/
   RELIABILITY.md             what the numbers are worth  <- read this
+  synthetic_warp.json        known-posture-change results
   HANDOFF.md                 state and next steps
   repeatability.json         raw measurements
   reference_distribution.json

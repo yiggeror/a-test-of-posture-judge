@@ -1,0 +1,42 @@
+{
+  "n_images": 38,
+  "skipped": {
+    "no_pose": 8,
+    "not_side": 9,
+    "warp_lost_pose": 8,
+    "view_changed": 12
+  },
+  "shift_fractions": [
+    -0.06,
+    -0.04,
+    -0.02,
+    0.02,
+    0.04,
+    0.06,
+    0.08,
+    0.1
+  ],
+  "metrics": {
+    "forward_head": {
+      "n": 280,
+      "slope_least_squares": 1.0711,
+      "slope_robust_median": 1.005,
+      "rms_residual_deg": 5.188,
+      "max_abs_residual_deg": 34.821
+    },
+    "shoulder_protraction": {
+      "n": 284,
+      "slope_least_squares": 0.984,
+      "slope_robust_median": 0.9642,
+      "rms_residual_deg": 2.541,
+      "max_abs_residual_deg": 20.828
+    },
+    "head_over_hip": {
+      "n": 284,
+      "slope_least_squares": 1.0068,
+      "slope_robust_median": 0.972,
+      "rms_residual_deg": 2.189,
+      "max_abs_residual_deg": 20.904
+    }
+  }
+}
