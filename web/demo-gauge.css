@@ -1,0 +1,13 @@
+<style>
+.gauge{position:relative;height:26px;margin:2px 0 4px}
+.g-track{position:absolute;left:0;right:0;top:9px;height:6px;border-radius:3px;background:var(--track)}
+.g-zone{position:absolute;top:9px;height:6px}
+.g-zone.z1{background:color-mix(in srgb,var(--warn) 26%,transparent)}
+.g-zone.z2{background:color-mix(in srgb,var(--alert) 30%,transparent)}
+.g-tick{position:absolute;top:4px;width:1.5px;height:16px;background:var(--faint);opacity:.75}
+.g-bar{position:absolute;top:6px;height:12px;border-radius:2px;min-width:2px}
+.g-dot{position:absolute;top:3px;width:2.5px;height:18px;border-radius:1px;background:var(--ink)}
+.g-lab{position:absolute;top:19px;font-family:var(--mono);font-size:9.5px;color:var(--faint);
+       transform:translateX(-50%);white-space:nowrap}
+.g-out{position:absolute;top:7px;font-family:var(--mono);font-size:11px;color:var(--alert);font-weight:600}
+</style>

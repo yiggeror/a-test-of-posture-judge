@@ -1,0 +1,52 @@
+<div class="wrap">
+  <p class="eyebrow">Posture readout · demo</p>
+  <h1>体态读数台</h1>
+  <p class="lede">从全身照的 33 个骨骼关键点算出体态读数。每个读数都带实测的不确定度，<strong>在测不准的地方它会拒绝下判定</strong>。</p>
+
+  <div class="note">
+    <b>这是功能演示，不是医学诊断。</b> 页面里的关键点由仓库的 Python 版（MediaPipe heavy 模型）预先检测好并嵌入，
+    浏览器里实时运行的是完整的视角判定、指标计算、不确定度传播、守卫和阈值逻辑——
+    也就是小程序端要移植的那一部分。底部列出了本演示相比仓库版少掉的两道守卫。
+  </div>
+
+  <h2>选一张照片</h2>
+  <div class="picker" id="picker"></div>
+
+  <div class="panel">
+    <div class="shot">
+      <canvas id="cv" width="400" height="600"></canvas>
+      <p class="shotcap" id="shotcap"></p>
+    </div>
+    <div>
+      <div class="chips" id="chips"></div>
+      <div id="msgs"></div>
+      <div id="unavail"></div>
+      <div class="rows" id="rows"></div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <h3>这个演示少了什么</h3>
+    <ul>
+      <li><b>独立人体检测守卫</b>（EfficientDet-Lite，13.8 MB）。仓库版用它抓「一张手掌照被贴上完整人体骨架」这类假阳性——姿态模型自己的 visibility 分数对此毫无预警作用。</li>
+      <li><b>关键点稳定性守卫</b>。仓库版把图像轻微缩放后重跑一次推理，位置明显漂移的关键点说明模型是在推测而不是看到它。这是唯一能抓「长发盖住耳朵、visibility 却报 1.000」那类失效的手段，代价是多一次推理。</li>
+      <li><b>浏览器实时推理</b>。MediaPipe 的 JS 版需要在运行时抓取 wasm 与模型文件，而本页所在的沙箱只允许从 CDN 加载脚本、不允许运行时 fetch。真正的小程序或网站没有这个限制。</li>
+    </ul>
+
+    <h3>读数怎么读</h3>
+    <ul>
+      <li>刻度上的两道刻痕是「轻度」与「明显」的分界，深色区段是读数的 ±1σ 范围。<b>区段跨过刻痕时，工具不给档位</b>——那意味着它分不清。</li>
+      <li><b>实测分位数</b>标签表示阈值来自本仓库参考图像集的分布（侧面 n=35，正面 n=95）；<b>凭经验设定</b>表示那个数字是手定的，目前只剩「躯干前后倾」一项。</li>
+      <li>某个关键点落在画面外时，只停用依赖它的指标，其余照常出。脚出画不会让整张照片作废。</li>
+    </ul>
+
+    <h3>边界</h3>
+    <ul>
+      <li><b>没有临床效度。</b>阈值是常模参照——「你的读数在一堆照片里排第几」，不是「你有没有问题」。参考人群是未经筛查的普通照片。异常 ≠ 不健康。</li>
+      <li>侧面那两项阈值基于 n=35，过了最低门槛但不是稳定估计，标为暂定。</li>
+      <li>直立的雕塑、人体模特与玩偶会被当成人。姿态模型和独立检测模型都会，因为它们就是人形。</li>
+      <li>相机自身的倾斜会 1:1 叠加到高低肩和骨盆侧倾上，单张未标定照片无法区分。</li>
+    </ul>
+    <p style="margin:0">示例照片均为 Pexels License。测量方法与全部实测数字见仓库 <b>reports/RELIABILITY.md</b>。</p>
+  </div>
+</div>

@@ -44,6 +44,7 @@ unmeasured.
 ./.venv/bin/python -m pytest tests/ -q          # 186 passed
 ./.venv/bin/python app.py                       # HTML page, http://127.0.0.1:5000
 ./.venv/bin/python api.py                       # JSON API,  http://127.0.0.1:5001
+./.venv/bin/python scripts/export_web_demo.py   # build web/demo.html (verifies the JS port)
 ```
 
 Building a mini-program or mobile client? Read
@@ -77,6 +78,28 @@ Useful scripts:
 ./.venv/bin/python scripts/coco_mine.py --ann-dir <coco-annotations> --view side --out cand.csv
 ./.venv/bin/python scripts/fetch_from_manifest.py --manifest cand.csv --out-dir <dir>
 ```
+
+---
+
+## Browser port (`web/`)
+
+`web/posture.js` is a line-by-line port of the `posture/` package — view
+classification, all ten metrics, per-landmark uncertainty propagation, every
+guard, threshold banding. **This is the file a mini-program reuses**, because
+MediaPipe's JS build runs the same BlazePose 33-point model, so
+`landmark_noise.json` and the measured percentile thresholds carry over
+unchanged. (Swap the pose model and they do not — see `reports/DEPLOYMENT.md`.)
+
+The equivalence is checked, not asserted. `scripts/export_web_demo.py` runs
+the Python pipeline over sample photographs, runs `posture.js` over the same
+landmarks under node, and compares view, blocks, warnings, unavailable
+metrics, every reading, every uncertainty and every band — then **fails the
+build on any mismatch**. Current result: 6 samples, all fields, 0 diffs.
+
+The comparison runs with `deep_guards=False`: the two guards that need a
+second model pass (independent person detection, landmark stability) have no
+browser equivalent. That difference is deliberate and is stated on the demo
+page itself.
 
 ---
 
@@ -301,6 +324,11 @@ Excluded by policy, not oversight: **YOLO-pose** (AGPL-3.0) and **OpenPose**
 ```
 app.py                 Flask single-page app (HTML)
 api.py                 JSON API for mini-program / mobile clients
+web/
+  posture.js           the logic, ported to JS  <- what a mini-program reuses
+  demo-render.js       demo page canvas + scale-bar rendering
+  demo-*.html/css      demo page structure and styling
+  demo.html            built demo, assembled by scripts/export_web_demo.py
 posture/
   geometry.py          pure angle maths, no vision deps, exactly testable
   landmarks.py         MediaPipe Tasks wrapper (the mp.solutions.* API is gone in 1.0.x)
@@ -319,6 +347,7 @@ scripts/
   synthetic_warp.py          accuracy: readings under a KNOWN posture change
   commons_explore.py         Wikimedia Commons candidate search (see Test data)
   reference_distribution.py  norm-reference percentiles for thresholds
+  export_web_demo.py         build web/demo.html; fails if the JS port disagrees
 reports/
   RELIABILITY.md             what the numbers are worth  <- read this
   DEPLOYMENT.md              mini-program / on-device constraints
