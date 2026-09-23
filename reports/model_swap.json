@@ -1,0 +1,78 @@
+{
+ "n_images": 73,
+ "view_disagreements": 3,
+ "metrics": {
+  "forward_head": {
+   "n": 31,
+   "median_abs_diff_deg": 3.87,
+   "p90_abs_diff_deg": 14.69,
+   "median_uncertainty_deg": 1.92,
+   "frac_diff_gt_1sigma": 0.677
+  },
+  "head_over_hip": {
+   "n": 31,
+   "median_abs_diff_deg": 1.41,
+   "p90_abs_diff_deg": 2.91,
+   "median_uncertainty_deg": 0.98,
+   "frac_diff_gt_1sigma": 0.581
+  },
+  "head_tilt": {
+   "n": 46,
+   "median_abs_diff_deg": 3.75,
+   "p90_abs_diff_deg": 9.65,
+   "median_uncertainty_deg": 6.47,
+   "frac_diff_gt_1sigma": 0.174
+  },
+  "head_vs_shoulder_tilt": {
+   "n": 46,
+   "median_abs_diff_deg": 3.69,
+   "p90_abs_diff_deg": 10.04,
+   "median_uncertainty_deg": 6.63,
+   "frac_diff_gt_1sigma": 0.196
+  },
+  "knee_deviation": {
+   "n": 31,
+   "median_abs_diff_deg": 4.07,
+   "p90_abs_diff_deg": 22.23,
+   "median_uncertainty_deg": 3.64,
+   "frac_diff_gt_1sigma": 0.548
+  },
+  "lateral_head_shift": {
+   "n": 46,
+   "median_abs_diff_deg": 0.77,
+   "p90_abs_diff_deg": 2.69,
+   "median_uncertainty_deg": 0.86,
+   "frac_diff_gt_1sigma": 0.478
+  },
+  "pelvis_tilt": {
+   "n": 46,
+   "median_abs_diff_deg": 1.49,
+   "p90_abs_diff_deg": 5.05,
+   "median_uncertainty_deg": 5.18,
+   "frac_diff_gt_1sigma": 0.065
+  },
+  "shoulder_protraction": {
+   "n": 31,
+   "median_abs_diff_deg": 1.09,
+   "p90_abs_diff_deg": 4.19,
+   "median_uncertainty_deg": 1.43,
+   "frac_diff_gt_1sigma": 0.387
+  },
+  "shoulder_tilt": {
+   "n": 46,
+   "median_abs_diff_deg": 1.54,
+   "p90_abs_diff_deg": 4.15,
+   "median_uncertainty_deg": 1.38,
+   "frac_diff_gt_1sigma": 0.5
+  },
+  "trunk_sway": {
+   "n": 31,
+   "median_abs_diff_deg": 1.39,
+   "p90_abs_diff_deg": 8.12,
+   "median_uncertainty_deg": 1.98,
+   "frac_diff_gt_1sigma": 0.419
+  }
+ },
+ "reference": "pose_landmarker_heavy.task",
+ "candidate": "pose_landmarker_full.task"
+}

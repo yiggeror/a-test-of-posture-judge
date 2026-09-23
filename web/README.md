@@ -1,48 +1,54 @@
-# web/ — 浏览器端移植
+# web/ — 浏览器版（和小程序功能对齐）
 
-`posture.js` 是 `posture/` 这个 Python 包的逐行移植：视角判定、指标计算、
-逐关键点的不确定度传播、守卫、阈值分档。**小程序要移植的就是这一份。**
-
-## 为什么可以直接用
-
-MediaPipe 的 JS 版（`@mediapipe/tasks-vision`）用的是同一个 BlazePose 33 点
-模型，所以 `reports/landmark_noise.json` 的逐关键点噪声和
-`reports/reference_distribution.json` 的分位数阈值**直接适用，不需要重新标定**。
-
-换成别的姿态模型就不成立了——见 `reports/DEPLOYMENT.md`。
-
-## 一致性是验证过的，不是声称的
-
-`scripts/export_web_demo.py` 会：
-
-1. 用 Python 版对示例照片跑检测，导出关键点 + 常量
-2. 在 node 里用 `posture.js` 跑同一批关键点
-3. 逐项比对视角、阻断、警告、停用指标、每个读数值、每个不确定度、每个档位
-
-当前结果：**6 张样本、全部字段、0 差异**。改动 `posture.js` 或 Python 任一侧
-之后都应该重跑一次。
-
-比对用 `deep_guards=False`，因为浏览器端没有那两道需要额外模型推理的守卫
-（独立人体检测、关键点稳定性）。这是有意的差异，demo 页面底部也写明了。
-
-## 用法
-
-```js
-// 关键点来自 MediaPipe tasks-vision 的 PoseLandmarker
-// P: 33 个 [x, y, visibility]，像素坐标
-const V = estimateView(P, W, H);
-const mets = computeAll(P, V);
-const { findings, oof } = guards(P, V, mets, W, H, V.scale, otherBoxes, origScale);
-```
-
-`C` 是常量对象（噪声模型 + 阈值 + 建议文案），由导出脚本生成。
+打开页面 → 上传全身照 → 本机下载模型并分析 → 扫描动画 → 结论和改善动作。
+**照片不离开设备**：姿态模型在浏览器里运行。
 
 ## 文件
 
 | 文件 | 作用 |
 |---|---|
-| `posture.js` | **移植的核心逻辑**，小程序复用这个 |
-| `demo-render.js` | 演示页的画布与刻度尺渲染 |
-| `demo-styles.html` / `demo-gauge.css` / `demo-body.html` | 演示页的样式与结构 |
+| `posture.js` | `posture/` 的移植：视角、指标、不确定度、守卫、档位，以及 `report()`——用户看到的结论（`posture/report.py` 的移植）。**小程序复用这一份** |
+| `engine.js` | 加载 MediaPipe PoseLandmarker（CDN 上的加载脚本 + 同源的 wasm 和模型字节） |
+| `src/app.html` `src/app.css` `src/app.js` | 页面结构、样式、交互和动画 |
+| `dist/` | `scripts/build_web.py` 的产物（wasm 和模型分片不进 git） |
 
-演示页面用 `scripts/export_web_demo.py` 组装。
+用户看到的所有文字（问题名称、说明、改善动作、重拍提示、免责声明）都在
+`posture/consumer_zh.json`，Python API 和网页共用同一份。
+
+## 构建
+
+```bash
+./.venv/bin/python scripts/build_web.py
+```
+
+产出 `web/dist/index.html`（独立页面，放任何静态托管都能用）、`artifact.html`
+（给会自动套 `<html>` 骨架的托管用），以及 wasm 和 3 个模型分片（每片 ≤14 MB）。
+
+## 一致性是验证过的，不是声称的
+
+构建时会对 `testdata/` 里**每一张**能检测到人的照片（当前 116 张）同时跑 Python
+和 `posture.js`，比对视角、阻断/警告守卫、停用指标、每个读数和不确定度、每个档位，
+以及**用户看到的报告**（问题、程度、方向、原因文案）。任何差异都会让构建失败。
+当前结果：0 差异。
+
+这个检查第一次扩大到全部照片时抓到了一个真实偏差：旧的 JS 移植在脚出画时跳过了
+「膝盖弯曲 / 身体倾斜」守卫，Python 不跳过。结果是半身照在网页上能出结论、在
+Python 里被拒。之前只比对 6 张样本，没覆盖到。已按 Python 修正。
+
+浏览器端的 MediaPipe 结果也单独核对过：同一个 heavy 模型、同一张图，JS 与 Python
+的关键点差异中位数是体长的 0.003%，最大 0.04%，远小于模型自身的定位噪声。
+
+## 与 Python 版的一处有意差异
+
+浏览器没有独立人体检测模型（EfficientDet，13.8 MB）。它在 Python 里负责拦截
+「手掌特写被贴上完整骨架」这类假阳性。网页用户是主动上传自己的全身照，这类输入
+少见，为此多下载 14 MB 不划算。**关键点稳定性守卫在浏览器里是有的**（同一张图
+缩放 4% 再检测一次，漂移的关键点对应的指标不出结论）。
+
+## 为什么是 42 MB 的 heavy 模型
+
+所有阈值和不确定度都是在 `pose_landmarker_heavy` 上测出来的。
+`scripts/compare_models.py` 实测了体积小三分之二的 `full` 模型：头部前移读数在
+58% 的照片上两个模型相差超过读数自身的误差，73 张里有 3 张连正/侧面都判得不同。
+所以 full 是另一台仪器，换它等于重新标定。页面打开后就在后台下载，首次约 42 MB，
+之后走浏览器缓存。

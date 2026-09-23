@@ -124,7 +124,14 @@ class Assessment:
     # metric key -> landmark names that are outside the image, so the metric
     # was measured from an extrapolated point and is withheld
     unavailable: dict[str, list[str]] = field(default_factory=dict)
+    # metric key -> landmark names that moved when the image was perturbed,
+    # i.e. were inferred rather than seen (hair over an ear, a loose sleeve).
+    # Withheld exactly like `unavailable`; only populated by deep guards.
+    unstable: dict[str, list[str]] = field(default_factory=dict)
     error_zh: str = ""
+    # The detected subject, kept so a report can say which side of the photo
+    # a deviation is on. None when nothing was detected.
+    pose: L.PoseResult | None = None
 
     @property
     def disclaimer_zh(self) -> str:
@@ -180,22 +187,36 @@ def assess(image_rgb: np.ndarray, *, deep_guards: bool = True,
     # that actually rest on a landmark outside the image, and report the rest.
     unavailable = G.unavailable_metrics(pose, measurements)
 
+    # Same treatment for a landmark the stability guard caught being inferred:
+    # a reading built on it is a guess about the anatomy, so it is withheld
+    # rather than shown with a caveat nobody reads.
+    drifted = set()
+    for f in findings:
+        if f.key == "unstable_landmarks":
+            drifted |= set(f.detail.get("drift_frac_of_body_scale", {}))
+    unstable = {}
+    for key, m in measurements.items():
+        bad = [L.LANDMARK_NAMES[i] for i in m.landmark_indices
+               if L.LANDMARK_NAMES[i] in drifted]
+        if bad and key not in unavailable:
+            unstable[key] = bad
+
     specs = load_thresholds()
     judged = [k for k in measurements
               if k not in DIAGNOSTIC_ONLY and k in specs]
-    if judged and all(k in unavailable for k in judged):
+    if judged and all(k in unavailable or k in unstable for k in judged):
         # Nothing survives; now it IS a whole-photo failure.
         is_blocked = True
         findings.append(G.GuardFinding(
             key="all_metrics_unavailable", severity=G.SEVERITY_BLOCK,
             message_zh="这张照片里可用的关键点不足以支持任何一项判定，"
-                       "通常是人物被裁切得太多。请上传更完整的照片。",
-            detail={"unavailable": unavailable}))
+                       "通常是人物被裁切得太多，或关键部位被遮挡。请上传更完整的照片。",
+            detail={"unavailable": unavailable, "unstable": unstable}))
 
     verdicts: dict[str, MetricVerdict] = {}
     if not is_blocked:
         for key, m in measurements.items():
-            if key in DIAGNOSTIC_ONLY or key in unavailable:
+            if key in DIAGNOSTIC_ONLY or key in unavailable or key in unstable:
                 continue
             spec = specs.get(key)
             if spec is None:
@@ -214,7 +235,8 @@ def assess(image_rgb: np.ndarray, *, deep_guards: bool = True,
 
     return Assessment(ok=not is_blocked, view=view, measurements=measurements,
                       verdicts=verdicts, findings=findings, blocked=is_blocked,
-                      noise=noise, unavailable=unavailable)
+                      noise=noise, unavailable=unavailable, unstable=unstable,
+                      pose=pose)
 
 
 def assess_file(path: str, **kw) -> Assessment:

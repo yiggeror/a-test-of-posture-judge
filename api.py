@@ -27,6 +27,7 @@ from posture import assess
 from posture import guards as G
 from posture import landmarks as L
 from posture.assess import DISCLAIMER_ZH
+from posture.report import consumer_report
 from posture.thresholds import DIAGNOSTIC_ONLY
 
 api = Flask(__name__)
@@ -113,6 +114,7 @@ def do_assess():
         return jsonify({
             "ok": False, "api_version": API_VERSION,
             "error": a.error_zh or "no person detected",
+            "report": consumer_report(a),
             "disclaimer": DISCLAIMER_ZH,
         }), 200
 
@@ -131,6 +133,11 @@ def do_assess():
         "unavailable": [{"key": k, "label": METRIC_LABELS.get(k, k),
                          "missing_landmarks": names}
                         for k, names in a.unavailable.items()],
+        # The plain answer for an end user: issues with exercises, what looked
+        # fine, what could not be judged, or what to change about the photo.
+        # A client that only wants to show a result should render this and
+        # nothing else. Same mapping and words as web/posture.js.
+        "report": consumer_report(a),
         "metrics": _metric_payload(a),
         "landmark_noise": {
             "frac_of_body_scale": a.noise.frac_of_body_scale,

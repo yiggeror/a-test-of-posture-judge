@@ -225,11 +225,19 @@ def _close_landmarkers() -> None:
 
 
 def load_rgb(path: str) -> np.ndarray:
-    """Read an image file into an HxWx3 uint8 RGB array."""
-    from PIL import Image
+    """Read an image file into an HxWx3 uint8 RGB array, upright.
+
+    Phone cameras store portrait photos as landscape pixels plus an EXIF
+    orientation tag. Browsers honour the tag; PIL does not unless asked. So
+    without the transpose, a portrait phone photo uploaded to the API reaches
+    the pose model lying on its side -- and the subject is rejected or, worse,
+    measured sideways. None of the committed test images carry the tag, which
+    is why nothing caught this.
+    """
+    from PIL import Image, ImageOps
 
     with Image.open(path) as im:
-        return np.array(im.convert("RGB"))
+        return np.array(ImageOps.exif_transpose(im).convert("RGB"))
 
 
 def body_scale(pose: PoseResult) -> float:

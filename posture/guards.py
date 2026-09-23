@@ -425,6 +425,20 @@ def check_view_suitability(view: ViewEstimate, metrics: dict) -> list[GuardFindi
     return out
 
 
+def stability_perturbation(image_rgb: np.ndarray) -> np.ndarray:
+    """The 4% downscale-and-restore used by check_landmark_stability.
+
+    Separate so a second implementation (the browser port) can be checked
+    against exactly the same perturbed pixels.
+    """
+    from PIL import Image
+
+    h, w = image_rgb.shape[:2]
+    small = Image.fromarray(image_rgb).resize(
+        (max(1, int(w * 0.96)), max(1, int(h * 0.96))), Image.LANCZOS)
+    return np.array(small.resize((w, h), Image.LANCZOS))
+
+
 def check_landmark_stability(image_rgb: np.ndarray, pose: L.PoseResult,
                              *, model_path: str | None = None
                              ) -> list[GuardFinding]:
@@ -438,15 +452,11 @@ def check_landmark_stability(image_rgb: np.ndarray, pose: L.PoseResult,
     The perturbation is a 4% downscale-and-restore, chosen to change the
     detector's input sampling without changing the depicted posture at all.
     """
-    from PIL import Image
-
     h, w = image_rgb.shape[:2]
     if min(h, w) < 64:
         return []
 
-    small = Image.fromarray(image_rgb).resize(
-        (max(1, int(w * 0.96)), max(1, int(h * 0.96))), Image.LANCZOS)
-    perturbed = np.array(small.resize((w, h), Image.LANCZOS))
+    perturbed = stability_perturbation(image_rgb)
 
     try:
         pose2 = L.detect(perturbed, model_path=model_path)

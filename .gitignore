@@ -15,3 +15,8 @@ __pycache__/
 # scripts/coco_mine.py --all-licenses followed by scripts/fetch_from_manifest.py.
 refset/
 candidates*.csv
+
+# web/dist binaries: the MediaPipe wasm (fetched by scripts/build_web.py from
+# jsdelivr) and the pose model split into parts (from models/). ~42 MB.
+web/dist/*.wasm
+web/dist/*.bin

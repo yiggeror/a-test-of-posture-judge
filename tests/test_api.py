@@ -126,3 +126,38 @@ class TestAssess:
             pytest.skip("no side testdata")
         r = self._post(client, imgs[0])
         json.dumps(r.get_json())   # would raise on a stray numpy type
+
+    def test_plain_report_ships_with_every_response(self, client):
+        # A client that only shows a result renders `report` and nothing else,
+        # so it must be there for a result, a retake, and a non-person alike.
+        for pattern in ("testdata/pexels/side/*.jpg",
+                        "testdata/pexels/edge/edge_rotated53*.jpg",
+                        "testdata/pexels/negative/neg_animal*.jpg"):
+            imgs = sorted(glob.glob(pattern))
+            if not imgs:
+                continue
+            rep = self._post(client, imgs[0]).get_json()["report"]
+            assert rep["status"] in ("ok", "retake")
+            assert rep["disclaimer"]
+            if rep["status"] == "retake":
+                assert rep["retake"] and all(x["tip"] for x in rep["retake"])
+
+    def test_portrait_phone_photo_is_measured_upright(self, client):
+        # The same photo stored the way a phone stores a portrait shot: pixels
+        # rotated to landscape plus EXIF orientation 6. It must be read upright
+        # and reach the same view as the original.
+        from PIL import Image
+        src = sorted(glob.glob("testdata/pexels/side/side_pexels_*.jpg"))
+        if not src:
+            pytest.skip("no side testdata")
+        im = Image.open(src[0]).convert("RGB")
+        rotated = im.transpose(Image.ROTATE_90)   # what the sensor stored
+        exif = rotated.getexif()
+        exif[0x0112] = 6                          # "rotate 90 CW to display"
+        buf = io.BytesIO()
+        rotated.save(buf, "JPEG", exif=exif)
+        r = client.post("/api/v1/assess",
+                        data={"photo": (io.BytesIO(buf.getvalue()), "phone.jpg")},
+                        content_type="multipart/form-data").get_json()
+        assert r["view"] == "side"
+        assert r["report"]["status"] == "ok"

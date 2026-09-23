@@ -1,11 +1,15 @@
 # a-test-of-posture-judge
 
-Upload a full-body photograph, get reference readings on standing posture.
+Upload a full-body photograph; get told, in plain words, which posture
+problems it shows and what exercises help.
 
-**This is not a medical device and does not diagnose anything.** It reports
-measured angles with their uncertainty, and describes them as tendencies
-(倾向) for reference (参考). Read [Known limitations](#known-limitations)
-before believing any number it produces.
+**This is not a medical device and does not diagnose anything.** Underneath the
+plain answer is an instrument that measures angles with their uncertainty and
+refuses to call a result it cannot resolve. Read
+[Known limitations](#known-limitations) before believing any number it produces.
+
+The user-facing app is in [`web/`](web/README.md): it runs the pose model in the
+browser, so the photo never leaves the device.
 
 ---
 
@@ -13,7 +17,7 @@ before believing any number it produces.
 
 | | |
 |---|---|
-| Code | working end to end, 186 tests |
+| Code | working end to end, 210 tests; browser app verified identical to Python on 116 photos |
 | Rotation tracking, all 9 metrics | **within 0.05 of theory** on two independent image sets |
 | Response to a **real** posture change | slope **1.007** / **0.984** — does not under-report actual deviation |
 | Frontal readings | reliable: 1–3% gross error, thresholds from a measured distribution |
@@ -41,10 +45,10 @@ unmeasured.
 
 ```bash
 ./scripts/setup.sh                              # system libs + venv + models + tests
-./.venv/bin/python -m pytest tests/ -q          # 186 passed
-./.venv/bin/python app.py                       # HTML page, http://127.0.0.1:5000
+./.venv/bin/python -m pytest tests/ -q          # 210 passed
+./.venv/bin/python scripts/build_web.py         # the user-facing app -> web/dist/ (verifies the JS port)
 ./.venv/bin/python api.py                       # JSON API,  http://127.0.0.1:5001
-./.venv/bin/python scripts/export_web_demo.py   # build web/demo.html (verifies the JS port)
+./.venv/bin/python app.py                       # engineering view with every reading, http://127.0.0.1:5000
 ```
 
 Building a mini-program or mobile client? Read
@@ -81,27 +85,30 @@ Useful scripts:
 
 ---
 
-## Browser port (`web/`)
+## The app (`web/`) and what a person is told
 
-`web/posture.js` is a line-by-line port of the `posture/` package — view
-classification, all ten metrics, per-landmark uncertainty propagation, every
-guard, threshold banding. **This is the file a mini-program reuses**, because
-MediaPipe's JS build runs the same BlazePose 33-point model, so
-`landmark_noise.json` and the measured percentile thresholds carry over
-unchanged. (Swap the pose model and they do not — see `reports/DEPLOYMENT.md`.)
+`scripts/build_web.py` builds a single page: upload a photo, the pose model runs
+in the browser, a scan animation plays, and the result is a short list of
+problems — each with a one-line explanation, a likely cause and three exercises —
+plus what looked fine. No angles, no error bars, no provenance tags: those stay
+in the engineering view (`app.py`) and the API's `metrics` field.
 
-The equivalence is checked, not asserted. `scripts/export_web_demo.py` runs
-the Python pipeline over sample photographs, runs `posture.js` over the same
-landmarks under node, and compares view, blocks, warnings, unavailable
-metrics, every reading, every uncertainty and every band — then **fails the
-build on any mismatch**. Current result: 6 samples, all fields, 0 diffs.
+The translation from instrument to plain answer is `posture/report.py`, with all
+wording in `posture/consumer_zh.json` (shared by the API's `report` field and the
+page). It is where the tool's caution has to survive, so the rule is explicit:
+the person is told the **least severe** thing the reading's error bar cannot
+rule out. A reading straddling slight/notable is reported as slight; one
+straddling normal/slight as 临界 (borderline); one the instrument cannot resolve
+is "not measured", never "fine"; a photo on which nothing could be judged is a
+retake request, never "no problems found".
 
-The comparison runs with `deep_guards=False`: the two guards that need a
-second model pass (independent person detection, landmark stability) have no
-browser equivalent. That difference is deliberate and is stated on the demo
-page itself.
-
----
+`web/posture.js` ports all of it. Parity is checked, not asserted: every build
+runs Python and the port over every test photo (116 with a detection) and
+compares guards, readings, bands **and the report**; any difference fails the
+build. Widening that check from 6 samples to every photo caught a real
+divergence — the old port skipped the knee/trunk neutrality guards when the
+feet were out of frame, so half-body photos got a result in the browser that
+Python rejects. Fixed to match Python. Details in [`web/README.md`](web/README.md).
 
 ## What it measures
 
@@ -237,6 +244,17 @@ These are measured or confirmed, not hypothetical.
     person-shaped. They are 2 of the 4 remaining guard leaks. Geometry cannot
     separate them and no further heuristics were attempted.
 
+12. **Lateral pelvic tilt never resolves, so users are not shown it.** On all
+    40 front-view test photos its uncertainty exceeded the width of its own
+    slight band: the two hip-joint landmarks are too close together for their
+    noise. The instrument still computes it; `report.py` leaves it out rather
+    than print "could not measure" on every result.
+
+13. **Portrait phone photos were measured sideways by the API** until EXIF
+    orientation was honoured in `load_rgb`. Browsers always honoured it. No
+    committed test image carries the tag, which is why nothing caught it; a
+    test now builds one.
+
 ---
 
 ## Test data
@@ -325,10 +343,10 @@ Excluded by policy, not oversight: **YOLO-pose** (AGPL-3.0) and **OpenPose**
 app.py                 Flask single-page app (HTML)
 api.py                 JSON API for mini-program / mobile clients
 web/
-  posture.js           the logic, ported to JS  <- what a mini-program reuses
-  demo-render.js       demo page canvas + scale-bar rendering
-  demo-*.html/css      demo page structure and styling
-  demo.html            built demo, assembled by scripts/export_web_demo.py
+  posture.js           the logic and the plain report, ported to JS  <- what a mini-program reuses
+  engine.js            loads MediaPipe in the browser from files next to the page
+  src/                 the app's markup, styles and interaction
+  dist/                build output (wasm and model parts not committed)
 posture/
   geometry.py          pure angle maths, no vision deps, exactly testable
   landmarks.py         MediaPipe Tasks wrapper (the mp.solutions.* API is gone in 1.0.x)
@@ -337,6 +355,8 @@ posture/
   thresholds.py        every cut point, with a provenance tag and its basis
   guards.py            when NOT to answer
   assess.py            orchestration, verdict assembly, advice
+  report.py            the plain answer a person reads (issues, exercises, retakes)
+  consumer_zh.json     every word of it, shared by API and web
   overlay.py           skeleton drawing
 scripts/
   setup.sh
@@ -347,7 +367,9 @@ scripts/
   synthetic_warp.py          accuracy: readings under a KNOWN posture change
   commons_explore.py         Wikimedia Commons candidate search (see Test data)
   reference_distribution.py  norm-reference percentiles for thresholds
-  export_web_demo.py         build web/demo.html; fails if the JS port disagrees
+  build_web.py               build web/dist/; fails if the JS port disagrees on any test photo
+  compare_models.py          can a smaller pose model stand in? (measured: no)
+  report_survey.py           what a person would be told, photo by photo
 reports/
   RELIABILITY.md             what the numbers are worth  <- read this
   DEPLOYMENT.md              mini-program / on-device constraints
@@ -356,4 +378,5 @@ reports/
   repeatability.json         raw measurements
   reference_distribution.json
   landmark_noise.json        feeds the ± on every reading
+  model_swap.json            heavy vs full pose model on the same photos
 ```
