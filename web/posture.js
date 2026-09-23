@@ -155,6 +155,12 @@ function guards(P,V,mets,W,H,S,others,origS){
     if((px(P,LWR).y-px(P,LHIP).y)/S<g.MIN_WRIST_BELOW_HIP_FRAC||(px(P,RWR).y-px(P,RHIP).y)/S<g.MIN_WRIST_BELOW_HIP_FRAC)
       out.push({sev:"warn",key:"arms_not_at_side"});
   }
+  // guards.check_side_arms: wrists far in front of the hips = reaching or
+  // leaning on something, so head and shoulders are placed by the task.
+  if(V.view==="side"){const sc=bodyScale(P,W,H);
+    if(sc>1e-6){const ahead=[[LWR,LHIP],[RWR,RHIP]].filter(([w])=>!oof.has(w))
+        .map(([w,h])=>(px(P,w).x-px(P,h).x)*V.facing/sc);
+      if(ahead.length&&Math.max(...ahead)>g.MAX_WRIST_AHEAD_OF_HIP_FRAC)out.push({sev:"block",key:"arms_reaching"});}}
   for(const k in mets){const m=mets[k];
     if(m.plane==="sagittal"&&Math.abs(m.val)>g.MAX_PLAUSIBLE_ANGLE){out.push({sev:"block",key:"implausible_reading"});break;}}
   // Absolute pixels, so judged on the photo's original resolution.

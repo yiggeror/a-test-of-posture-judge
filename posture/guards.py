@@ -128,6 +128,16 @@ CRITICAL_LANDMARKS = (
     L.LEFT_HIP, L.RIGHT_HIP, L.LEFT_ANKLE, L.RIGHT_ANKLE,
 )
 
+# Side view: a wrist further in front of its hip than this, as a fraction of
+# body scale, means the arms are reaching or resting on something, so the
+# shoulders and head are placed by the task, not by the person's posture.
+# provenance: guess -- set between what was observed, not derived. Neutral
+# standing side photos (three upright studio shots, one cropped studio shot,
+# one user-supplied photo) put the wrist at most 0.08 ahead of the hip; the
+# two candid photos that passed every other guard while working at a kitchen
+# counter put it at 0.22 and 0.25. The cut sits between them.
+MAX_WRIST_AHEAD_OF_HIP_FRAC = 0.15
+
 # Minimum subject height, shoulder to ankle, in pixels.
 #
 # provenance: measured -- scripts/repeatability.py stratified by subject size
@@ -392,6 +402,34 @@ def check_frontal_neutrality(pose: L.PoseResult) -> list[GuardFinding]:
     return out
 
 
+def check_side_arms(pose: L.PoseResult, view: ViewEstimate) -> list[GuardFinding]:
+    """Side view: are the arms hanging, or reaching for something?
+
+    The front view has its own arm check; the side view had none, and two
+    candid photos of people working at a counter passed every guard with their
+    head and shoulders pulled forward by the task.
+    """
+    if view.view != "side":
+        return []
+    scale = L.body_scale(pose)
+    if scale <= 1e-6:
+        return []
+    escaped = out_of_frame_landmarks(pose)
+    ahead = []
+    for wrist, hip in ((L.LEFT_WRIST, L.LEFT_HIP), (L.RIGHT_WRIST, L.RIGHT_HIP)):
+        if wrist in escaped:
+            continue   # an extrapolated wrist says nothing about the arm
+        ahead.append((pose.xy(wrist)[0] - pose.xy(hip)[0]) * view.facing / scale)
+    if not ahead or max(ahead) <= MAX_WRIST_AHEAD_OF_HIP_FRAC:
+        return []
+    return [GuardFinding(
+        key="arms_reaching", severity=SEVERITY_BLOCK,
+        message_zh="手臂在往前伸或撑着东西，头和肩的位置是被动作带着走的，"
+                   "不是平时的站姿，不作判定。",
+        detail={"wrist_ahead_of_hip_frac": round(max(ahead), 3),
+                "limit": MAX_WRIST_AHEAD_OF_HIP_FRAC})]
+
+
 def check_output_sanity(metrics: dict) -> list[GuardFinding]:
     """Reject readings beyond what a human body can produce."""
     out = []
@@ -599,6 +637,7 @@ def run_all(pose: L.PoseResult, view: ViewEstimate, metrics: dict,
     findings += check_pose_neutrality(metrics)
     if view.view in ("front", "oblique"):
         findings += check_frontal_neutrality(pose)
+    findings += check_side_arms(pose, view)
     findings += check_output_sanity(metrics)
     if deep and image_rgb is not None:
         findings += check_is_person(image_rgb, pose)

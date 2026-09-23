@@ -99,6 +99,7 @@
     "knees_not_extended": {"title": "看起来不是站着", "tip": "请站着拍，不要坐着或蹲着。"},
     "trunk_leaning": {"title": "身体在前倾或后仰", "tip": "请自然站直，不用刻意挺胸，也别弯腰。"},
     "stance_too_wide": {"title": "双脚分得太开", "tip": "请双脚与髋同宽站立，不要跨步。"},
+    "arms_reaching": {"title": "手在往前伸", "tip": "请双臂自然垂在身体两侧，别拿东西、别扶着台面。"},
     "multiple_people": {"title": "画面里不止一个人", "tip": "请只拍你自己，旁边别有其他人。"},
     "implausible_proportions": {"title": "没拍到完整的站立人体", "tip": "请从头到脚完整入镜，手机竖着拍。"},
     "degenerate_geometry": {"title": "没拍到完整的站立人体", "tip": "请从头到脚完整入镜，手机竖着拍。"},

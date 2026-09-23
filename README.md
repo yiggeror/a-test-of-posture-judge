@@ -17,14 +17,14 @@ browser, so the photo never leaves the device.
 
 | | |
 |---|---|
-| Code | working end to end, 210 tests; browser app verified identical to Python on 116 photos |
+| Code | working end to end, 217 tests; browser app verified identical to Python on 116 photos |
 | Rotation tracking, all 9 metrics | **within 0.05 of theory** on two independent image sets |
 | Response to a **real** posture change | slope **1.007** / **0.984** — does not under-report actual deviation |
 | Frontal readings | reliable: 1–3% gross error, thresholds from a measured distribution |
 | Sagittal readings, long-span (`head_over_hip`, `shoulder_protraction`) | reliable: 5% on candids, 0% on studio photos |
 | Sagittal readings, short-span (`forward_head`, `knee_deviation`) | **weak** — 22–25% on candids; `forward_head` cannot resolve its own thresholds |
 | False-positive guards | 6% leak on the 62-image negative set, against 29% previously |
-| Thresholds | **5 of 6** judged metrics now use measured percentiles, including both sagittal ones |
+| Thresholds | frontal: measured percentiles; **sagittal: judged against upright alignment** (the percentiles missed an obvious forward head — see limitation 2) |
 | Clinical validity | **none, for any metric** — no image in this project carries a clinical label |
 
 The single most useful thing this repo contains is
@@ -45,7 +45,7 @@ unmeasured.
 
 ```bash
 ./scripts/setup.sh                              # system libs + venv + models + tests
-./.venv/bin/python -m pytest tests/ -q          # 210 passed
+./.venv/bin/python -m pytest tests/ -q          # 217 passed
 ./.venv/bin/python scripts/build_web.py         # the user-facing app -> web/dist/ (verifies the JS port)
 ./.venv/bin/python api.py                       # JSON API,  http://127.0.0.1:5001
 ./.venv/bin/python app.py                       # engineering view with every reading, http://127.0.0.1:5000
@@ -180,18 +180,30 @@ These are measured or confirmed, not hypothetical.
    long-span metrics are at 1–5%. On studio photography everything drops to
    0–6%. See [`reports/RELIABILITY.md`](reports/RELIABILITY.md).
 
-2. **One threshold is still a guess, and the measured ones rest on n=35.**
-   `head_over_hip` (n=35), `shoulder_protraction` (n=35) and the three frontal
-   metrics (n=95) now use measured percentiles. `trunk_sway` is still `guess`
-   and is *refused* a measured threshold, because its own p90 error (10.3°)
-   exceeds the proposed 80th-percentile cut (7.8°). n=35 clears the n≥20
-   minimum but is not a stable percentile estimate; treat the sagittal cuts as
-   provisional.
+2. **The sagittal thresholds were wrong, and are now judged against upright.**
+   An earlier version replaced the hand-picked sagittal cuts with the 80th and
+   95th percentiles of readings over candid photos (n=35), and this README
+   claimed the hand-picked values had been "too strict". The first real user
+   test disproved that: a side photo with an obvious forward head read
+   `head_over_hip` = +11.7° and was reported as normal, because the percentile
+   cut was 14.6°. Percentiles of unscreened candid photos say what is common,
+   and a large forward head is common.
 
-   Worth noting how wrong the hand-picked values were: `head_over_hip` was set
-   by hand at 5.0° and measures 14.6° at the 80th percentile,
-   `shoulder_protraction` 8.0° against 10.4°, `shoulder_tilt` 2.0° against
-   6.0°. Every guess was too strict, i.e. would have flagged most people.
+   `head_over_hip` and `shoulder_protraction` are now *criterion*-referenced:
+   the reference is upright plumb-line alignment (ear over shoulder over hip).
+   Its zero was checked on the three upright studio side photos (−0.7, +0.3,
+   +0.6°; shoulder −5.0, −5.9, −3.9°) and the cuts sit at 5°/10° and 5°/12°.
+   The multiples are a judgment, tagged `geometric-estimate`, and the upper
+   cut rests on one real forward-head example. A regression test pins that
+   photo's reading (the photo itself is not in the repo; its licence is unknown).
+   The frontal metrics keep their percentiles, because their ideal is
+   symmetric about zero and the reference readings cluster there.
+   `trunk_sway` is still a `guess`.
+
+   The same review found two candid side photos of people working at a
+   kitchen counter passing every guard with their head pulled forward by the
+   task. A side-view arm guard now rejects photos with a wrist well in front
+   of the hip (`arms_reaching`).
 
 3. **No clinical validity, at all.** There is no labelled data in this
    project. The best available calibration is norm-referencing — where your
@@ -249,6 +261,15 @@ These are measured or confirmed, not hypothetical.
     slight band: the two hip-joint landmarks are too close together for their
     noise. The instrument still computes it; `report.py` leaves it out rather
     than print "could not measure" on every result.
+
+14. **A rounded upper back (驼背) and rounded shoulders seen from the front
+    are not measured.** BlazePose has no spine landmarks. Two ways around that
+    were tried and dropped: the body silhouette's back contour (mediapipe
+    1.0.1's segmentation-mask export crashes on most photos, including the one
+    that prompted it, and the few readings it gave were scattered), and the
+    hands-rotated-inward sign from the front (the user's rounded-shoulder photo
+    scored 0.50, 11th of the 36 guard-passing front photos -- no separation).
+    A front-only result says so and asks for a side photo.
 
 13. **Portrait phone photos were measured sideways by the API** until EXIF
     orientation was honoured in `load_rgb`. Browsers always honoured it. No

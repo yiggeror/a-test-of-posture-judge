@@ -263,3 +263,38 @@ class TestFrontalNeutralityWithCroppedFeet:
             p.landmarks[idx] = L.Landmark(lm.x, p.landmarks[L.LEFT_SHOULDER].y,
                                           lm.z, 1.0, 1.0)
         assert "arms_not_at_side" in keys(G.check_frontal_neutrality(p))
+
+
+class TestSideArms:
+    """Side view: hands reaching forward means a task posture, not a standing one."""
+
+    def _reach(self, pose, frac):
+        from posture.view import estimate_view
+        f = estimate_view(pose).facing
+        sc = L.body_scale(pose)
+        for w, h in ((L.LEFT_WRIST, L.LEFT_HIP), (L.RIGHT_WRIST, L.RIGHT_HIP)):
+            hx = pose.landmarks[h].x
+            lm = pose.landmarks[w]
+            pose.landmarks[w] = L.Landmark(hx + f * frac * sc, lm.y, lm.z, 1.0, 1.0)
+        return pose
+
+    def test_hanging_arms_pass(self):
+        from posture.view import estimate_view
+        p = self._reach(make_pose(view="side"), 0.05)
+        assert G.check_side_arms(p, estimate_view(p)) == []
+
+    def test_hands_on_a_counter_block(self):
+        from posture.view import estimate_view
+        p = self._reach(make_pose(view="side"), 0.25)
+        (f,) = G.check_side_arms(p, estimate_view(p))
+        assert f.key == "arms_reaching" and f.severity == G.SEVERITY_BLOCK
+
+    def test_hands_behind_the_body_do_not_block(self):
+        from posture.view import estimate_view
+        p = self._reach(make_pose(view="side"), -0.25)
+        assert G.check_side_arms(p, estimate_view(p)) == []
+
+    def test_front_view_is_not_checked_here(self):
+        from posture.view import estimate_view
+        p = make_pose(view="front")
+        assert G.check_side_arms(p, estimate_view(p)) == []

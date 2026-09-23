@@ -73,18 +73,18 @@ class TestClassification:
 class TestReferenceDistributionLoading:
     def test_missing_file_keeps_defaults_and_tags(self):
         specs = load_thresholds("/nonexistent/reference.json")
-        assert specs["head_over_hip"].provenance == "guess"
-        assert specs["head_over_hip"].slight == DEFAULTS["head_over_hip"].slight
+        assert specs["lateral_head_shift"].provenance == "guess"
+        assert specs["lateral_head_shift"].slight == DEFAULTS["lateral_head_shift"].slight
 
     def test_percentiles_upgrade_provenance(self):
         with tempfile.TemporaryDirectory() as d:
             path = os.path.join(d, "ref.json")
             with open(path, "w") as fh:
                 json.dump({"source": "unit test",
-                           "metrics": {"head_over_hip": {
+                           "metrics": {"lateral_head_shift": {
                                "n": 120, "abs_p80": 14.2, "abs_p95": 23.9}}}, fh)
             specs = load_thresholds(path)
-        s = specs["head_over_hip"]
+        s = specs["lateral_head_shift"]
         assert s.provenance == "population-percentile"
         assert s.slight == 14.2 and s.notable == 23.9
         assert s.n == 120
@@ -95,12 +95,12 @@ class TestReferenceDistributionLoading:
         with tempfile.TemporaryDirectory() as d:
             path = os.path.join(d, "ref.json")
             with open(path, "w") as fh:
-                json.dump({"metrics": {"head_over_hip": {
+                json.dump({"metrics": {"lateral_head_shift": {
                     "n": 9, "abs_p80": 14.2, "abs_p95": 23.9}}}, fh)
             specs = load_thresholds(path)
-        s = specs["head_over_hip"]
+        s = specs["lateral_head_shift"]
         assert s.provenance == "guess"
-        assert s.slight == DEFAULTS["head_over_hip"].slight
+        assert s.slight == DEFAULTS["lateral_head_shift"].slight
         assert "n=9" in s.basis
 
     def test_percentile_basis_disclaims_clinical_meaning(self):
@@ -119,14 +119,52 @@ class TestReferenceDistributionLoading:
             with open(path, "w") as fh:
                 fh.write("{not json")
             specs = load_thresholds(path)
-        assert specs["head_over_hip"].provenance == "guess"
+        assert specs["lateral_head_shift"].provenance == "guess"
 
     def test_loading_does_not_mutate_defaults(self):
-        before = DEFAULTS["head_over_hip"].slight
+        before = DEFAULTS["lateral_head_shift"].slight
         with tempfile.TemporaryDirectory() as d:
             path = os.path.join(d, "ref.json")
             with open(path, "w") as fh:
-                json.dump({"metrics": {"head_over_hip": {
+                json.dump({"metrics": {"lateral_head_shift": {
                     "n": 99, "abs_p80": 99.0, "abs_p95": 111.0}}}, fh)
             load_thresholds(path)
-        assert DEFAULTS["head_over_hip"].slight == before
+        assert DEFAULTS["lateral_head_shift"].slight == before
+
+
+class TestCriterionReferenced:
+    """Sagittal verdicts are judged against upright, not against a crowd."""
+
+    def test_percentiles_never_replace_criterion_cuts(self):
+        from posture.thresholds import CRITERION_REFERENCED
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "ref.json")
+            with open(path, "w") as fh:
+                json.dump({"metrics": {k: {"n": 500, "abs_p80": 14.6, "abs_p95": 33.1}
+                                       for k in CRITERION_REFERENCED}}, fh)
+            specs = load_thresholds(path)
+        for k in CRITERION_REFERENCED:
+            assert specs[k].slight == DEFAULTS[k].slight, k
+            assert specs[k].provenance != "population-percentile", k
+
+    def test_the_forward_head_photo_the_percentiles_missed_is_notable(self):
+        # Regression for a real miss. A user-supplied side photo with an
+        # obvious forward head read head_over_hip = +11.66 +/- 0.99 deg, and
+        # the percentile cut (14.6) called it normal. Only the numbers are
+        # kept here; the photo itself is not in the repo (unknown licence).
+        from posture.assess import MetricVerdict, _below_noise_floor, _resolve_band
+        from posture.metrics import Measurement
+        from posture.report import LEVEL_NOTABLE, level_for
+        spec = load_thresholds()["head_over_hip"]
+        m = Measurement("head_over_hip", "x", 11.66, 0.99, "sagittal", 500.0)
+        band, resolved, alt = _resolve_band(m, spec)
+        v = MetricVerdict(measurement=m, band=band, band_label_zh="", spec=spec,
+                          resolved=resolved, alternative_band=alt,
+                          below_noise_floor=_below_noise_floor(m, spec))
+        assert level_for(v) == LEVEL_NOTABLE
+
+    def test_upright_studio_readings_stay_normal(self):
+        # The three upright studio side photos the zero was checked against.
+        spec = load_thresholds()["head_over_hip"]
+        for reading in (-0.7, 0.3, 0.6):
+            assert spec.classify(reading + 1.0) == BAND_REFERENCE

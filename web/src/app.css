@@ -194,3 +194,67 @@ body{color:var(--ink);font-family:var(--font);font-size:15px;line-height:1.6;-we
   .frame.scanning .beam{display:none}
 }
 @media (min-width:560px){ .app{padding-block:28px 36px} }
+
+/* ---- motion & session UI (v3) ---- */
+.enter{animation:screenIn .42s cubic-bezier(.2,.8,.2,1) both}
+@keyframes screenIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+#home.enter .st{animation:rise .6s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--i,0)*70ms)}
+#home.enter .sample{animation:rise .55s cubic-bezier(.2,.8,.2,1) both}
+
+.cta{position:relative;overflow:hidden}
+.cta::after{content:"";position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(110deg,transparent 35%,rgba(255,255,255,.22) 50%,transparent 65%);
+  transform:translateX(-120%);animation:shine 4.2s ease-in-out 1.2s infinite}
+@keyframes shine{0%,60%{transform:translateX(-120%)}85%,100%{transform:translateX(120%)}}
+.sample img{transition:transform .5s ease}
+@media (hover:hover){.sample:hover img{transform:scale(1.05)}}
+
+.progress{height:4px;border-radius:99px;background:var(--line);margin:14px 4px 0;overflow:hidden}
+.progress span{display:block;height:100%;background:linear-gradient(90deg,var(--jade),#5FF0C8);
+  transform-origin:left;transform:scaleX(0);transition:transform .45s cubic-bezier(.2,.8,.2,1)}
+.steps li{animation:rise .45s cubic-bezier(.2,.8,.2,1) both}
+.steps li:nth-child(2){animation-delay:60ms}.steps li:nth-child(3){animation-delay:120ms}
+.steps li:nth-child(4){animation-delay:180ms}.steps li:nth-child(5){animation-delay:240ms}
+.steps li.done i{animation:pop .35s cubic-bezier(.3,1.6,.5,1)}
+@keyframes pop{from{transform:scale(.4)}to{transform:scale(1)}}
+
+.pcard .swap{position:absolute;top:16px;right:16px;z-index:2;display:inline-flex;align-items:center;gap:4px;
+  font-size:12px;font-weight:600;color:#fff;background:rgba(8,18,15,.6);backdrop-filter:blur(6px);
+  -webkit-backdrop-filter:blur(6px);padding:3px 10px 3px 8px;border-radius:99px}
+.pcard .swap svg{width:13px;height:13px}
+.photos.two .pcard .swap{top:auto;bottom:16px;right:50%;transform:translateX(50%)}
+
+.badge{position:relative}
+.summary .badge{animation:badgeIn .6s cubic-bezier(.3,1.5,.5,1) both}
+@keyframes badgeIn{from{transform:scale(.3) rotate(-12deg);opacity:0}to{transform:none;opacity:1}}
+.burst{position:absolute;inset:0;pointer-events:none}
+.burst i{position:absolute;left:50%;top:50%;width:6px;height:6px;margin:-3px;border-radius:50%;background:var(--c);
+  opacity:0;animation:burst .9s cubic-bezier(.2,.8,.2,1) .35s both}
+@keyframes burst{0%{opacity:1;transform:rotate(var(--a)) translateX(10px) scale(1)}
+  100%{opacity:0;transform:rotate(var(--a)) translateX(var(--d)) scale(.4)}}
+.chip{animation:rise .5s cubic-bezier(.2,.8,.2,1) both}
+
+.tip{grid-template-columns:auto 1fr;align-items:start;gap:4px 12px}
+.tip > div{min-width:0}
+.tip > div b{display:block}
+.tip > div span{display:block}
+.tip .demo{width:72px;height:72px;border-radius:14px;background:var(--bg);flex:none;margin-top:2px}
+.tip i{grid-row:auto}
+
+.actions{position:sticky;bottom:calc(10px + env(safe-area-inset-bottom,0px));z-index:5;display:flex;gap:10px;
+  margin-top:18px;padding:10px;border-radius:22px;background:color-mix(in srgb,var(--surface) 88%,transparent);
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:var(--shadow)}
+.act{flex:1;height:48px;border-radius:15px;display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  font-size:15px;font-weight:600;transition:transform .15s ease}
+.act:active{transform:scale(.97)}
+.act svg{width:18px;height:18px}
+.act.ghost{background:var(--bg);color:var(--ink2)}
+.act.solid{background:var(--ink);color:var(--bg)}
+.next{border:0}
+
+.toast{position:fixed;left:50%;bottom:calc(92px + env(safe-area-inset-bottom,0px));z-index:20;transform:translateX(-50%);
+  max-width:min(420px,calc(100% - 32px));padding:10px 16px;border-radius:14px;background:var(--ink);color:var(--bg);
+  font-size:13.5px;line-height:1.5;box-shadow:0 12px 30px -10px rgba(0,0,0,.4);animation:toastIn .3s ease both}
+.toast.out{animation:toastOut .3s ease both}
+@keyframes toastIn{from{opacity:0;transform:translate(-50%,10px)}to{opacity:1;transform:translate(-50%,0)}}
+@keyframes toastOut{to{opacity:0;transform:translate(-50%,10px)}}

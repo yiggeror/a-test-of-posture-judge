@@ -105,25 +105,38 @@ DEFAULTS: dict[str, ThresholdSpec] = {
     "head_over_hip": ThresholdSpec(
         key="head_over_hip", label_zh="头部前移",
         slight=5.0, notable=10.0, direction="positive_only",
-        provenance="guess",
+        provenance="geometric-estimate",
         basis="How far the ear sits in front of the hip, as an angle from "
-              "vertical. This is the tool's primary forward-head reading "
-              "because it is the most precise one it has (+/-1.1 deg, 5% gross "
-              "error), not because a published cutoff exists in this geometry "
-              "-- none does. It deliberately skips the shoulder, which is the "
-              "noisiest landmark in the set. At a ~1.0 m hip-to-ear distance, "
-              "5 deg is about 9 cm of forward head carriage and 10 deg about "
-              "18 cm. Those are hand-picked, but both are comfortably above "
-              "the 3x-uncertainty floor. Both cut points are chosen by hand.",
+              "vertical. CRITERION-referenced, not population-referenced: the "
+              "reference is ideal plumb-line alignment (ear over shoulder over "
+              "hip, the standard sagittal posture reference), which is 0 deg in "
+              "this geometry. That zero is checked, not assumed: the three "
+              "upright studio side photos in testdata/pexels read -0.7, +0.3 "
+              "and +0.6 deg. Measurement noise is +/-1.0 deg (1 sigma). The "
+              "cuts sit at 5x and 10x that noise above the zero; the multiples "
+              "are a judgment. A user-supplied side photo with an obvious forward "
+              "head (not in the repo: its licence is unknown) reads +11.7. The "
+              "only other photo seen above 5 deg that passed the guards, "
+              "coco_333626, is a cook bent over a counter -- a task posture, "
+              "which the side-view arm guard added alongside these cuts now "
+              "rejects. So the upper cut rests on one real example. These cuts replaced "
+              "measured 80th/95th percentiles (14.6/33.1) that missed the "
+              "user-supplied photo entirely: percentiles of unscreened candid "
+              "photos say what is common, and a large forward head is common.",
     ),
     "shoulder_protraction": ThresholdSpec(
         key="shoulder_protraction", label_zh="圆肩（肩前移）",
-        slight=8.0, notable=15.0, direction="positive_only",
-        provenance="guess",
-        basis="Acromion displacement from the hip, as an angle from vertical. "
-              "No published cutoff is expressed in this geometry. Raised from "
-              "an earlier hand-picked 6/12 so that the lower cut clears 3x the "
-              "measured uncertainty (+/-1.4 deg). Still chosen by hand.",
+        slight=5.0, notable=12.0, direction="positive_only",
+        provenance="geometric-estimate",
+        basis="Shoulder joint displacement from the hip, as an angle from "
+              "vertical. CRITERION-referenced like head_over_hip. The upright "
+              "zero is NOT 0 in this geometry: MediaPipe's shoulder landmark "
+              "sits slightly behind its hip landmark in upright stance, and the "
+              "three upright studio side photos read -5.0, -5.9 and -3.9 deg. "
+              "The cuts sit 10 and 17 deg forward of that zero (measurement "
+              "noise +/-1.4 deg); the offsets are a judgment. Replaced measured "
+              "percentiles (10.4/35.7) for the same reason as head_over_hip: a "
+              "35.7 deg upper-body lean is not a standing posture at all.",
     ),
     "trunk_sway": ThresholdSpec(
         key="trunk_sway", label_zh="躯干前后倾",
@@ -188,6 +201,19 @@ DEFAULTS: dict[str, ThresholdSpec] = {
 DIAGNOSTIC_ONLY = {"forward_head", "head_tilt", "head_vs_shoulder_tilt",
                    "knee_deviation"}
 
+# Metrics judged against an ideal alignment rather than against a population.
+# load_thresholds() never replaces these with reference-set percentiles.
+#
+# Why: the sagittal percentiles came from unscreened candid photographs, where
+# a forward head and a forward-leaning upper body are common. Their 80th
+# percentile therefore marked only the extreme tail as a "slight tendency",
+# and a user-supplied photo with an obvious forward head (+11.7 deg, against an
+# upright studio zero of about 0) came back as normal. For a posture check, the
+# useful question is "how far from upright", not "how rare among photos".
+# The frontal metrics keep their percentiles: their ideal is symmetric about 0
+# and the reference readings cluster there, so the two framings agree.
+CRITERION_REFERENCED = {"head_over_hip", "shoulder_protraction"}
+
 
 def load_thresholds(path: str | None = None) -> dict[str, ThresholdSpec]:
     """Return thresholds, preferring measured percentiles where available.
@@ -209,6 +235,8 @@ def load_thresholds(path: str | None = None) -> dict[str, ThresholdSpec]:
         return specs
 
     for key, spec in specs.items():
+        if key in CRITERION_REFERENCED:
+            continue
         entry = (ref.get("metrics") or {}).get(key)
         if not entry:
             continue

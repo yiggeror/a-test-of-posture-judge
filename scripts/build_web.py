@@ -80,7 +80,7 @@ def constants(assets: dict) -> dict:
                   "MAX_STANCE_WIDTH_RATIO", "MAX_WEIGHT_SHIFT_FRAC",
                   "MIN_WRIST_BELOW_HIP_FRAC", "MIN_KNEE_EXTENSION_FRONT_DEG",
                   "MIN_SUBJECT_HEIGHT_PX", "BYSTANDER_SIZE_RATIO",
-                  "UNSTABLE_LANDMARK_FRAC")
+                  "UNSTABLE_LANDMARK_FRAC", "MAX_WRIST_AHEAD_OF_HIP_FRAC")
     copy = {k: v for k, v in COPY.items() if not k.startswith("_")}
     return {
         "noise": {"overall": n.frac_of_body_scale,
@@ -304,6 +304,7 @@ def page(consts: dict, samples: list[dict]) -> str:
         + ";\nconst SAMPLES=" + json.dumps(samples, separators=(",", ":")) + ";\n</script>",
         "<script>\n" + read(os.path.join(WEB, "posture.js")) + "\n</script>",
         "<script>\n" + read(os.path.join(WEB, "engine.js")) + "\n</script>",
+        "<script>\n" + read(os.path.join(src, "moves.js")) + "\n</script>",
         "<script>\n" + read(os.path.join(src, "app.js")) + "\n</script>",
     ])
 

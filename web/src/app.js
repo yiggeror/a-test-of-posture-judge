@@ -1,6 +1,14 @@
 "use strict";
 /* UI for the posture check: upload -> (model download) -> scan animation ->
-   plain result. All judging is done by posture.js; this file only shows it. */
+   plain result. All judging is done by posture.js; this file only shows it.
+
+   Sessions. One "检测" is one person. It starts when a photo is uploaded from
+   the home screen or an example is opened, and ends on 重新检测, on closing
+   (×), or when the next one starts. Only the two "add to this check" actions
+   on a result -- 补拍 the other view, or 换一张 on a photo -- put a new photo
+   into the current session; an added photo of a view the session already has
+   replaces it. Everything else starts clean, so two different people are
+   never merged into one report. */
 const $=s=>document.querySelector(s);
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const nextFrame=()=>new Promise(r=>requestAnimationFrame(()=>r()));
@@ -10,23 +18,34 @@ const MAX_SIDE=2048;                 // cap on the analysed canvas; the model se
 const MB=Math.round(C.assets.bytes/1e6);
 const LEVEL_RGB={notable:"#FF6A55",slight:"#FFB23F",borderline:"#B9C8D8"};
 const VIEW_ZH={side:"侧面",front:"正面"};
+const OTHER={side:"front",front:"side"};
 const ICON={
   check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
   alert:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 6.5v7M12 17.5v.01"/></svg>',
   move:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13" cy="4.5" r="2"/><path d="M8 21l3-6 3 2v4M6 11l3-3 4 1 3 3 3 1M11 15l1-5"/></svg>',
   camera:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8.5A2.5 2.5 0 0 1 6.5 6h1.6l1.4-2h5l1.4 2h1.6A2.5 2.5 0 0 1 20 8.5v9a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 17.5z"/><circle cx="12" cy="13" r="3.6"/></svg>',
-  x:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M7 7l10 10M17 7L7 17"/></svg>'
+  x:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M7 7l10 10M17 7L7 17"/></svg>',
+  redo:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v5h5"/></svg>',
+  swap:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h13l-3-3M20 16H7l3 3"/></svg>'
 };
 
-const state={results:{},last:null,busy:false};
+const state={
+  session:{id:0,entries:{}},  // entries: {side?, front?}
+  job:0,                      // bumped to cancel an analysis in flight
+  busy:false,
+  intent:"new",               // what the next picked file does: "new" | "add"
+  pending:null                // the job to repeat after a failed model download
+};
 const fileInput=$("#file");
 
+function newSession(){state.session={id:state.session.id+1,entries:{}};}
+function hasResults(){return Object.keys(state.session.entries).length>0;}
+
 /* ---------------- analysis engine (downloaded in the background) -------- */
-let engineErr=null;const progressFns=new Set();
+const progressFns=new Set();
 function startEngine(){
-  return Engine.load({wasm:C.assets.wasm,modelParts:C.assets.model,modelEncoding:C.assets.encoding,totalBytes:C.assets.bytes,
-    onProgress:f=>progressFns.forEach(fn=>fn(f))})
-    .then(x=>{engineErr=null;return x;},e=>{engineErr=e;throw e;});
+  return Engine.load({wasm:C.assets.wasm,modelParts:C.assets.model,modelEncoding:C.assets.encoding,
+    totalBytes:C.assets.bytes,onProgress:f=>progressFns.forEach(fn=>fn(f))});
 }
 // Most people pick a photo within seconds of arriving; starting the download
 // now means the wait is mostly over by then. Skipped when the browser asks to
@@ -36,13 +55,25 @@ if(!(navigator.connection&&navigator.connection.saveData))
 
 /* ---------------- screens ---------------- */
 function show(name){
-  for(const id of ["home","analyze","result"])$("#"+id).hidden=id!==name;
+  for(const id of ["home","analyze","result"]){
+    const el=$("#"+id),on=id===name;el.hidden=!on;
+    if(on&&!REDUCED){el.classList.remove("enter");void el.offsetWidth;el.classList.add("enter");}
+  }
   $("#closeBtn").hidden=name==="home";
   window.scrollTo({top:0});
   hero.run(name==="home");
+  if(name!=="result"){Moves.stop();pulse.stop();}
 }
-$("#closeBtn").addEventListener("click",()=>{if(!state.busy)show("home");});
+function goHome(){state.job++;state.busy=false;newSession();show("home");}
+$("#closeBtn").addEventListener("click",goHome);
 $("#disclaimer").textContent=C.copy.disclaimer;
+
+let toastTimer=0;
+function toast(msg){
+  const t=$("#toast");t.textContent=msg;t.hidden=false;t.classList.remove("out");
+  clearTimeout(toastTimer);toastTimer=setTimeout(()=>{t.classList.add("out");
+    setTimeout(()=>{t.hidden=true;},300);},3200);
+}
 
 /* ---------------- photo handling ---------------- */
 async function fromFile(file){
@@ -73,15 +104,17 @@ function fitFrame(fr,W,H,maxW,maxH){
 }
 function sizeStage(ph){
   const maxW=frame.parentElement.clientWidth-28;
-  fitFrame(frame,ph.W,ph.H,maxW,Math.max(260,window.innerHeight*0.58));
+  fitFrame(frame,ph.W,ph.H,maxW,Math.max(260,window.innerHeight*0.56));
 }
 function steps(i,viewText){
   const li=[...document.querySelectorAll("#steps li")];
   li.forEach((el,j)=>{el.classList.toggle("done",j<i);el.classList.toggle("on",j===i);});
   if(viewText)$("#stepView").textContent="判断拍摄角度："+viewText;
   else if(i<=2)$("#stepView").textContent="判断拍摄角度";
+  progress(Math.min(1,i/5));
 }
-async function ensureEngine(){
+function progress(f){$("#progressBar").style.transform="scaleX("+f.toFixed(3)+")";}
+async function ensureEngine(token){
   if(Engine.ready)return true;
   frame.classList.add("dim");loader.hidden=false;$("#loaderActions").hidden=true;
   $("#ring").hidden=false;
@@ -90,8 +123,9 @@ async function ensureEngine(){
     $("#ringBar").style.strokeDashoffset=String(276.5*(1-f));
     $("#loaderSub").textContent="首次使用需要下载约 "+MB+" MB（已完成 "+Math.round(f*MB)+" MB），之后会快很多";};
   setP(0);progressFns.add(setP);
-  try{await startEngine();return true;}
+  try{await startEngine();return token===state.job;}
   catch(e){
+    if(token!==state.job)return false;
     $("#ring").hidden=true;
     $("#loaderTitle").textContent="分析模型没能加载";$("#loaderTitle").classList.add("err");
     $("#loaderSub").textContent="可能是网络不稳定。可以重试，或先看看示例的分析效果。";
@@ -100,27 +134,31 @@ async function ensureEngine(){
   }finally{progressFns.delete(setP);}
 }
 $("#retryBtn").addEventListener("click",()=>{if(state.pending)analyze(state.pending);});
-$("#toSamplesBtn").addEventListener("click",()=>{state.busy=false;show("home");
-  $("#samples").scrollIntoView({behavior:REDUCED?"auto":"smooth",block:"center"});});
+$("#toSamplesBtn").addEventListener("click",()=>{goHome();
+  requestAnimationFrame(()=>$("#samples").scrollIntoView({behavior:REDUCED?"auto":"smooth",block:"center"}));});
 
-/* job: {kind:"file", file} | {kind:"sample", sample} */
+/* job: {kind:"file", file, add} | {kind:"sample", sample} */
 async function analyze(job){
+  const token=++state.job;const live=()=>token===state.job;
   state.pending=job;state.busy=true;
-  show("analyze");steps(0);
+  show("analyze");steps(0);progress(0.04);
   const ctx=overlay.getContext("2d");ctx.clearRect(0,0,overlay.width,overlay.height);
   frame.classList.remove("scanning","dim");loader.hidden=true;
   let ph,S=null;
   if(job.kind==="file"){
     try{ph=await fromFile(job.file);}
-    catch(e){state.busy=false;return finish({ph:null,S:null,r:null,rep:retakeOnly("unreadable")});}
+    catch(e){if(!live())return;state.busy=false;return finish({ph:null,S:null,r:null,rep:retakeOnly("unreadable")},job);}
   }else{
     const s=job.sample;ph={src:"data:image/jpeg;base64,"+s.jpg,W:s.w,H:s.h,f:1};
   }
+  if(!live())return;
   photo.src=ph.src;sizeStage(ph);sizeCanvas(overlay,frame);
-  if(job.kind==="file"&&!(await ensureEngine())){state.busy=false;return;}
+  if(job.kind==="file"&&!(await ensureEngine(token))){if(live())state.busy=false;return;}
+  if(!live())return;
   frame.classList.remove("dim");loader.hidden=true;
-  frame.classList.add("scanning");
+  frame.classList.add("scanning");progress(0.12);
   await nextFrame();await sleep(REDUCED?0:450);
+  if(!live())return;
   const t0=performance.now();
   if(job.kind==="file"){
     const det=Engine.detect(ph.canvas,ph.W,ph.H);
@@ -134,39 +172,48 @@ async function analyze(job){
   }
   // Let the sweep read as a scan even when detection is instant.
   const left=(REDUCED?0:1100)-(performance.now()-t0);if(left>0)await sleep(left);
+  if(!live())return;
   frame.classList.remove("scanning");
   const r=S?assess(S):null;
   const rep=r?report(r):retakeOnly("no_pose");
   const entry={ph,S,r,rep};
-  if(r)await scanReveal(entry);
+  if(r)await scanReveal(entry,live);
+  if(!live())return;
   state.busy=false;
-  finish(entry);
+  finish(entry,job);
 }
 function retakeOnly(key){
   const c=key==="unreadable"?{title:"读不出这张图片",tip:"请换一张 JPG 或 PNG 格式的照片。"}:C.copy.retake.no_pose;
   return {status:"retake",retake:[Object.assign({key},c)],issues:[],borderline:[],good:[],not_measured:[],photo_tips:[],other_view:null};
 }
-async function scanReveal(entry){
+async function scanReveal(entry,live){
   const {r,rep}=entry,marks=marksFor(entry,rep.issues.map((x,i)=>Object.assign({num:i+1},x)).concat(rep.borderline));
   const T={pts:0,edges:0,plumb:0,marks:0};
   const run=(key,ms)=>new Promise(res=>{
-    if(REDUCED){T[key]=1;drawOverlay(overlay,entry,T,marks);return res();}
+    if(REDUCED||!live()){T[key]=1;drawOverlay(overlay,entry,T,marks);return res();}
     const t0=performance.now();
     const tick=now=>{T[key]=Math.min(1,(now-t0)/ms);drawOverlay(overlay,entry,T,marks,now);
-      T[key]<1?requestAnimationFrame(tick):res();};
+      T[key]<1&&live()?requestAnimationFrame(tick):res();};
     requestAnimationFrame(tick);
   });
   steps(1);await run("pts",750);
   steps(2,VIEW_ZH[r.V.view]||"斜侧");await run("edges",520);
-  steps(3);await run("plumb",480);await run("marks",520);
-  steps(4);await sleep(REDUCED?0:420);steps(5);await sleep(REDUCED?0:260);
+  steps(3);await run("plumb",480);await run("marks",560);
+  steps(4);await sleep(REDUCED?0:380);steps(5);await sleep(REDUCED?0:240);
 }
-function finish(entry){
-  state.last=entry;
-  if(entry.rep.status==="ok")state.results[entry.rep.view]=entry;
-  entry.rep.status==="ok"?renderResult():renderRetake(entry);
-  show("result");
-  requestAnimationFrame(()=>drawResultPhotos());
+function finish(entry,job){
+  if(entry.rep.status!=="ok"){renderRetake(entry);show("result");placeRetakePhoto(entry);return;}
+  const view=entry.rep.view,s=state.session.entries;
+  const replaced=!!s[view];
+  if(job.kind==="file"&&job.add&&replaced){
+    const other=OTHER[view];
+    toast(s[other]?"已用新照片替换之前的"+VIEW_ZH[view]+"照":
+      "这张也是"+VIEW_ZH[view]+"照，已替换之前那张。要检查"+C.copy.other_view[other].covers+"，请上传"+VIEW_ZH[other]+"照");
+  }else if(job.kind==="file"&&job.add&&!replaced&&hasResults()){
+    toast("已加入"+VIEW_ZH[view]+"照，结果已合并");
+  }
+  s[view]=entry;
+  renderResult();show("result");requestAnimationFrame(()=>{drawResultPhotos();Moves.mount($("#result"));});
 }
 
 /* ---------------- overlay drawing ---------------- */
@@ -201,13 +248,14 @@ function plumbX(r){
   if(r.V.view==="side"&&r.near)return P[r.near.hip][0];
   return (P[11][0]+P[12][0])/2;
 }
-function drawOverlay(cv,entry,T,marks,now){
+/* T: reveal progress per layer. `ping`: ms clock for the ambient radar pulse
+   on a finished result, or null. */
+function drawOverlay(cv,entry,T,marks,now,ping){
   const {r}=entry,P=r.P,ctx=cv.getContext("2d"),dpr=cv._dpr||1;
   const k=cv.width/dpr/r.W;
   ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,cv.width,cv.height);
   const X=i=>P[i][0]*k,Y=i=>P[i][1]*k;
   const lw=Math.max(1.6,Math.min(3.2,cv.width/dpr/150));
-  // plumb / midline
   if(T.plumb>0){
     const x=plumbX(r)*k,top=Math.min(Y(0),Y(7),Y(8))-r.V.scale*k*0.08;
     const bottom=Math.min(cv.height/dpr,Math.max(Y(27),Y(28))+6);
@@ -218,7 +266,6 @@ function drawOverlay(cv,entry,T,marks,now){
     ctx.beginPath();ctx.moveTo(x,top);ctx.lineTo(x,y1);ctx.stroke();ctx.restore();
     ctx.fillStyle="#5FF0C8";ctx.beginPath();ctx.arc(x,top,lw*1.6,0,7);ctx.fill();
   }
-  // skeleton
   if(T.edges>0){
     ctx.save();ctx.lineCap="round";
     for(const pass of [0,1]){
@@ -237,7 +284,6 @@ function drawOverlay(cv,entry,T,marks,now){
       ctx.fillStyle="#5FF0C8";ctx.beginPath();ctx.arc(X(i),Y(i),rr,0,7);ctx.fill();
     }
   }
-  // findings
   if(T.marks>0&&marks.length){
     const px0=plumbX(r)*k;
     for(const m of marks){
@@ -252,9 +298,15 @@ function drawOverlay(cv,entry,T,marks,now){
         ctx.save();ctx.lineWidth=lw+.8;ctx.strokeStyle=col;ctx.lineCap="round";
         ctx.beginPath();ctx.moveTo(px0,y);ctx.lineTo(px0+(x-px0)*e,y);ctx.stroke();ctx.restore();
       }
+      const R0=lw*4.2;
+      if(ping!=null&&m.level!=="borderline"){   // expanding radar ring
+        const ph=((ping+m.a*137)%1800)/1800;
+        ctx.save();ctx.globalAlpha=(1-ph)*.85;ctx.lineWidth=lw;ctx.strokeStyle=col;
+        ctx.beginPath();ctx.arc(x,y,R0*(1+ph*1.6),0,7);ctx.stroke();ctx.restore();
+      }
       const pulse=now&&T.marks<1?1+0.25*Math.sin(now/90):1;
       ctx.lineWidth=lw+.4;ctx.strokeStyle=col;ctx.fillStyle="rgba(0,0,0,.25)";
-      ctx.beginPath();ctx.arc(x,y,(lw*4.2)*e*pulse,0,7);ctx.fill();ctx.stroke();
+      ctx.beginPath();ctx.arc(x,y,R0*e*pulse,0,7);ctx.fill();ctx.stroke();
       if(m.num){
         const R=Math.max(9,lw*4),side=x>=px0?1:-1;
         let bx=x+side*(R*2.1),by=y-R*1.6;
@@ -266,12 +318,21 @@ function drawOverlay(cv,entry,T,marks,now){
     }
   }
 }
+/* Ambient pulse on the result photos, only while the result is on screen. */
+const pulse=(()=>{
+  let raf=0,items=[];
+  function loop(now){for(const it of items)drawOverlay(it.cv,it.entry,{pts:1,edges:1,plumb:1,marks:1},it.marks,null,now);
+    raf=items.length?requestAnimationFrame(loop):0;}
+  return {start(list){items=list;cancelAnimationFrame(raf);raf=0;
+            if(!REDUCED&&items.some(i=>i.marks.some(m=>m.level!=="borderline")))raf=requestAnimationFrame(loop);},
+          stop(){items=[];cancelAnimationFrame(raf);raf=0;}};
+})();
 
 /* ---------------- result screens ---------------- */
 function merged(){
-  const views=["side","front"].filter(v=>state.results[v]);
+  const E=state.session.entries,views=["side","front"].filter(v=>E[v]);
   const out={views,issues:[],borderline:[],good:[],nm:[],tips:[]};
-  for(const v of views){const rep=state.results[v].rep;
+  for(const v of views){const rep=E[v].rep;
     for(const x of rep.issues)out.issues.push(Object.assign({view:v},x));
     for(const x of rep.borderline)out.borderline.push(Object.assign({view:v},x));
     out.good.push(...rep.good);out.nm.push(...rep.not_measured);
@@ -281,87 +342,119 @@ function merged(){
   return out;
 }
 function photoCards(views){
+  const E=state.session.entries;
   return '<div class="photos'+(views.length>1?" two":"")+'">'+views.map(v=>
-    '<div class="pcard"><span class="tag">'+VIEW_ZH[v]+'</span><div class="frame" data-view="'+v+'">'+
-    '<img alt="'+VIEW_ZH[v]+'照片" src="'+state.results[v].ph.src+'"><canvas></canvas></div></div>').join("")+'</div>';
+    '<div class="pcard"><span class="tag">'+VIEW_ZH[v]+'</span>'+
+    '<button class="swap" type="button" data-swap="'+v+'" aria-label="换一张'+VIEW_ZH[v]+'照">'+ICON.swap+'换一张</button>'+
+    '<div class="frame" data-view="'+v+'"><img alt="'+VIEW_ZH[v]+'照片" src="'+E[v].ph.src+'"><canvas></canvas></div></div>').join("")+'</div>';
 }
 function drawResultPhotos(){
-  const m=merged();
+  const m=merged(),list=[];
   document.querySelectorAll("#result .frame[data-view]").forEach(fr=>{
-    const v=fr.dataset.view,entry=state.results[v],card=fr.parentElement;
+    const v=fr.dataset.view,entry=state.session.entries[v],card=fr.parentElement;
     const two=m.views.length>1;
-    fitFrame(fr,entry.ph.W,entry.ph.H,card.clientWidth-16,window.innerHeight*(two?0.42:0.52));
+    fitFrame(fr,entry.ph.W,entry.ph.H,card.clientWidth-16,window.innerHeight*(two?0.42:0.5));
     const cv=fr.querySelector("canvas");sizeCanvas(cv,fr);
     const items=m.issues.filter(x=>x.view===v).concat(m.borderline.filter(x=>x.view===v));
-    drawOverlay(cv,entry,{pts:1,edges:1,plumb:1,marks:1},marksFor(entry,items));
+    const marks=marksFor(entry,items);
+    drawOverlay(cv,entry,{pts:1,edges:1,plumb:1,marks:1},marks);
+    list.push({cv,entry,marks});
   });
+  pulse.start(list);
+}
+function tipHTML(t){
+  const demo=Moves.has(t.name)?'<canvas class="demo" data-move="'+esc(t.name)+'" aria-hidden="true"></canvas>':'<i>'+ICON.move+'</i>';
+  return '<div class="tip">'+demo+'<div><b>'+esc(t.name)+'</b><span>'+esc(t.how)+'</span></div></div>';
+}
+function burst(){
+  if(REDUCED)return "";
+  let s='<span class="burst" aria-hidden="true">';
+  for(let i=0;i<10;i++)s+='<i style="--a:'+(i*36)+'deg;--d:'+(i%2?30:40)+'px;--c:'+(i%3?"var(--jade)":"var(--amber)")+'"></i>';
+  return s+"</span>";
 }
 function renderResult(){
-  const m=merged(),n=m.issues.length,nb=m.borderline.length;
+  const m=merged(),n=m.issues.length,nb=m.borderline.length,single=m.views.length===1;
   const src=m.views.map(v=>VIEW_ZH[v]).join("和")+"照";
+  const missing=["side","front"].find(v=>!state.session.entries[v]);
+  const checked=m.views.map(v=>C.copy.other_view[v].covers).join("；");
   let badge,h,p;
   if(n){badge=m.issues.some(x=>x.level==="notable")?"bad":"warn";
     h="发现 "+n+" 个体态问题";p="根据"+src+"分析 · 下面是具体情况和改善动作";}
+  else if(single){badge="ok";h=VIEW_ZH[m.views[0]]+"看，没有发现问题";
+    p=nb?"有 "+nb+" 处在临界附近，可以留意":"检查了"+checked;}
   else if(nb){badge="ok";h="整体不错";p="有 "+nb+" 处在临界附近，可以留意";}
-  else{badge="ok";h="体态不错";p="根据"+src+"分析，检查的几项都在正常范围内";}
+  else{badge="ok";h="体态不错";p="正面和侧面检查的几项都在正常范围内";}
   let html=photoCards(m.views);
-  html+='<div class="summary rise"><div class="badge '+badge+'">'+(badge==="ok"?ICON.check:ICON.alert)+
+  html+='<div class="summary rise"><div class="badge '+badge+'">'+(badge==="ok"?ICON.check+(n||nb?"":burst()):ICON.alert)+
         '</div><div><h2>'+esc(h)+'</h2><p>'+esc(p)+'</p></div></div>';
+  // The one thing a single-view result must not hide: what it could not see.
+  if(missing){const ov=C.copy.other_view[missing];
+    html+='<button class="next rise" type="button" data-add="1">'+ICON.camera+'<div class="grow"><b>补拍一张'+esc(ov.label)+'照</b><span>'+
+      esc(ov.covers)+'要从'+esc(ov.label)+'才看得出来</span></div>'+
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></button>';}
   m.issues.forEach((x,i)=>{
-    html+='<article class="issue rise" style="animation-delay:'+(80+i*90)+'ms"><div class="issue-head">'+
+    html+='<article class="issue rise" style="animation-delay:'+(120+i*110)+'ms"><div class="issue-head">'+
       '<span class="num '+x.level+'">'+x.num+'</span><h3>'+esc(x.name)+'</h3><span class="lv '+x.level+'">'+esc(x.level_label)+'</span></div>'+
       '<p class="what">'+esc(x.summary)+'</p><p class="why">'+esc(x.why)+'</p>'+
-      '<div class="tips"><h4>改善动作</h4>'+x.tips.map(t=>'<div class="tip"><i>'+ICON.move+'</i><b>'+esc(t.name)+'</b><span>'+esc(t.how)+'</span></div>').join("")+
-      '</div></article>';
+      '<div class="tips"><h4>改善动作</h4>'+x.tips.map(tipHTML).join("")+'</div></article>';
   });
   if(nb)html+='<div class="block rise"><h4>可以留意</h4>'+m.borderline.map(x=>
       '<div class="row"><div class="grow"><b>'+esc(x.name)+'</b><p>'+esc(x.summary)+'程度在正常与轻度之间。</p></div><span class="lv borderline">'+esc(x.level_label)+'</span></div>').join("")+'</div>';
   if(m.good.length)html+='<div class="block rise"><h4>这些方面不错</h4><div class="chips">'+
-      m.good.map(g=>'<span class="chip">'+ICON.check+esc(g.name)+'</span>').join("")+'</div></div>';
+      m.good.map((g,i)=>'<span class="chip" style="animation-delay:'+(200+i*70)+'ms">'+ICON.check+esc(g.name)+'</span>').join("")+'</div></div>';
   const notes=[];
   if(m.nm.length)notes.push("<b>这次没检查：</b>"+m.nm.map(x=>esc(x.name)+"（"+esc(x.reason)+"）").join("；"));
   if(m.tips.length)notes.push("<b>拍摄小建议：</b>"+m.tips.map(esc).join(" "));
   if(notes.length)html+=notes.map(t=>'<p class="note">'+t+'</p>').join("");
-  const missing=["side","front"].find(v=>!state.results[v]);
-  if(missing){const ov=C.copy.other_view[missing];
-    html+='<button class="next rise" type="button" id="nextBtn">'+ICON.camera+'<div class="grow"><b>再拍一张'+esc(ov.label)+'照</b><span>还能检查'+esc(ov.covers)+'</span></div>'+
-      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></button>';}
-  html+='<button class="again" type="button" id="againBtn">重新检测</button>';
+  html+='<div class="actions"><button class="act ghost" type="button" data-again="1">'+ICON.redo+'重新检测</button>'+
+    (missing?'<button class="act solid" type="button" data-add="1">'+ICON.camera+'补拍'+VIEW_ZH[missing]+'照</button>':'')+'</div>';
   $("#result").innerHTML=html;
-  const nb2=$("#nextBtn");if(nb2)nb2.addEventListener("click",()=>fileInput.click());
-  $("#againBtn").addEventListener("click",()=>{state.results={};state.last=null;show("home");});
 }
 function renderRetake(entry){
-  const rep=entry.rep,has=Object.keys(state.results).length>0;
+  const rep=entry.rep,has=hasResults();
   let html="";
   if(entry.ph)html+='<div class="photos"><div class="pcard"><div class="frame" data-retake="1"><img alt="上传的照片" src="'+entry.ph.src+'"><canvas></canvas></div></div></div>';
   html+='<div class="summary rise"><div class="badge warn">'+ICON.alert+'</div><div><h2>这张照片没法准确分析</h2><p>换一张照片就好，按下面的提示拍</p></div></div>';
   html+='<div class="retake rise">'+rep.retake.map(x=>'<div class="row"><span class="rx">'+ICON.x+'</span><div class="grow"><b>'+esc(x.title)+'</b><p>'+esc(x.tip)+'</p></div></div>').join("")+'</div>';
-  html+='<button class="next rise" type="button" id="retakeBtn">'+ICON.camera+'<div class="grow"><b>换一张照片</b><span>全身入镜 · 正面或侧面 · 自然站直</span></div>'+
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></button>';
-  if(has)html+='<button class="again" type="button" id="backBtn">返回上次结果</button>';
+  html+='<div class="actions">'+(has?'<button class="act ghost" type="button" data-back="1">返回上次结果</button>'
+                                    :'<button class="act ghost" type="button" data-again="1">'+ICON.redo+'重新检测</button>')+
+        '<button class="act solid" type="button" data-'+(has?"add":"new")+'="1">'+ICON.camera+'换一张照片</button></div>';
   $("#result").innerHTML=html;
-  $("#retakeBtn").addEventListener("click",()=>fileInput.click());
-  const b=$("#backBtn");if(b)b.addEventListener("click",()=>{renderResult();requestAnimationFrame(drawResultPhotos);window.scrollTo({top:0});});
-  const fr=document.querySelector("#result .frame[data-retake]");
-  if(fr){const img=fr.querySelector("img");
-    const place=()=>{fitFrame(fr,entry.ph.W,entry.ph.H,fr.parentElement.clientWidth-16,window.innerHeight*0.42);
-      if(entry.r){const cv=fr.querySelector("canvas");sizeCanvas(cv,fr);drawOverlay(cv,entry,{pts:1,edges:1,plumb:0,marks:0},[]);}};
-    img.complete?place():img.addEventListener("load",place,{once:true});}
 }
+function placeRetakePhoto(entry){
+  const fr=document.querySelector("#result .frame[data-retake]");if(!fr)return;
+  const img=fr.querySelector("img");
+  const place=()=>{fitFrame(fr,entry.ph.W,entry.ph.H,fr.parentElement.clientWidth-16,window.innerHeight*0.42);
+    if(entry.r){const cv=fr.querySelector("canvas");sizeCanvas(cv,fr);drawOverlay(cv,entry,{pts:1,edges:1,plumb:0,marks:0},[]);}};
+  img.complete?place():img.addEventListener("load",place,{once:true});
+}
+// One delegated handler for every result-screen action.
+$("#result").addEventListener("click",e=>{
+  const b=e.target.closest("button");if(!b||state.busy)return;
+  if(b.dataset.again){goHome();return;}
+  if(b.dataset.back){renderResult();show("result");requestAnimationFrame(()=>{drawResultPhotos();Moves.mount($("#result"));});return;}
+  if(b.dataset.add||b.dataset.swap){pick("add");return;}
+  if(b.dataset.new){pick("new");}
+});
 window.addEventListener("resize",()=>{
   if(!$("#result").hidden&&document.querySelector("#result .frame[data-view]"))drawResultPhotos();
 });
 
 /* ---------------- inputs ---------------- */
+function pick(intent){state.intent=intent;fileInput.click();}
+$("#ctaUpload").addEventListener("click",()=>{state.intent="new";});
 fileInput.addEventListener("change",()=>{
   const f=fileInput.files&&fileInput.files[0];fileInput.value="";
-  if(f&&!state.busy)analyze({kind:"file",file:f});
+  if(!f||state.busy)return;
+  const add=state.intent==="add"&&hasResults();
+  if(!add)newSession();
+  state.intent="new";
+  analyze({kind:"file",file:f,add});
 });
 $("#samples").innerHTML=SAMPLES.map((s,i)=>
-  '<button class="sample" type="button" data-i="'+i+'"><img alt="'+esc(s.label)+'" src="data:image/jpeg;base64,'+s.thumb+'"><span>'+esc(s.label)+'</span></button>').join("");
+  '<button class="sample" type="button" data-i="'+i+'" style="animation-delay:'+(260+i*80)+'ms"><img alt="'+esc(s.label)+'" src="data:image/jpeg;base64,'+s.thumb+'"><span>'+esc(s.label)+'</span></button>').join("");
 $("#samples").addEventListener("click",e=>{const b=e.target.closest(".sample");
-  if(b&&!state.busy)analyze({kind:"sample",sample:SAMPLES[+b.dataset.i]});});
+  if(b&&!state.busy){newSession();analyze({kind:"sample",sample:SAMPLES[+b.dataset.i]});}});
 
 /* ---------------- hero figure: a real detected skeleton, being scanned ---------------- */
 const hero=(()=>{
@@ -396,4 +489,4 @@ const hero=(()=>{
   }
   return {run(v){on=v;cancelAnimationFrame(raf);if(v)raf=requestAnimationFrame(draw);}};
 })();
-hero.run(true);
+show("home");
