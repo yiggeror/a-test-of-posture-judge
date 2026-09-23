@@ -24,7 +24,7 @@ const fileInput=$("#file");
 /* ---------------- analysis engine (downloaded in the background) -------- */
 let engineErr=null;const progressFns=new Set();
 function startEngine(){
-  return Engine.load({wasm:C.assets.wasm,modelParts:C.assets.model,totalBytes:C.assets.bytes,
+  return Engine.load({wasm:C.assets.wasm,modelParts:C.assets.model,modelEncoding:C.assets.encoding,totalBytes:C.assets.bytes,
     onProgress:f=>progressFns.forEach(fn=>fn(f))})
     .then(x=>{engineErr=null;return x;},e=>{engineErr=e;throw e;});
 }

@@ -42,7 +42,17 @@ const Engine = (() => {
     });
   }
 
-  /* opts: {base, loaderUrl, wasm, modelParts: [...paths], totalBytes, onProgress(frac)} */
+  // Some hosts serve only web file types, so the model may arrive as base64
+  // text parts instead of raw bytes.
+  function fromBase64(bytes) {
+    const s = atob(new TextDecoder().decode(bytes).replace(/\s+/g, ""));
+    const out = new Uint8Array(s.length);
+    for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i);
+    return out;
+  }
+
+  /* opts: {base, loaderUrl, wasm, modelParts: [...paths], modelEncoding: "binary"|"base64",
+            totalBytes, onProgress(frac)} */
   function load(opts) {
     if (loading) return loading;
     loading = (async () => {
@@ -50,8 +60,9 @@ const Engine = (() => {
       let got = 0;
       const tick = n => { got += n; opts.onProgress && opts.onProgress(Math.min(0.99, got / opts.totalBytes)); };
       if (typeof Vision === "undefined") await loadScript(opts.bundleUrl || CDN + "/vision_bundle.js");
-      const [wasm, ...parts] = await Promise.all(
+      let [wasm, ...parts] = await Promise.all(
         [opts.wasm, ...opts.modelParts].map(p => fetchBytes(new URL(p, base).href, tick)));
+      if (opts.modelEncoding === "base64") parts = parts.map(fromBase64);
       let model;
       if (parts.length === 1) model = parts[0];
       else {

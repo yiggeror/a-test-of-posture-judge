@@ -21,8 +21,9 @@
 ./.venv/bin/python scripts/build_web.py
 ```
 
-产出 `web/dist/index.html`（独立页面，放任何静态托管都能用）、`artifact.html`
-（给会自动套 `<html>` 骨架的托管用），以及 wasm 和 3 个模型分片（每片 ≤14 MB）。
+产出 `web/dist/index.html`（独立页面，放任何静态托管都能用，加载 wasm 和 3 个
+二进制模型分片，共 42 MB）和 `artifact.html`（给会自动套 `<html>` 骨架、且只托管
+网页文件类型的环境用：同一个模型以 base64 文本分片提供，下载量约 53 MB）。
 
 ## 一致性是验证过的，不是声称的
 

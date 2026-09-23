@@ -2,11 +2,11 @@
 """Build the web app, and prove the browser gives the same answers as Python.
 
 Output (web/dist/):
-    index.html        standalone page for any static host or a mini-program webview
+    index.html        standalone page for any static host or a mini-program webview;
+                      loads vision_wasm_internal.wasm and pose_heavy.N.bin
     artifact.html     the same page as a body fragment, for hosts that add their
-                      own <html>/<head> skeleton
-    vision_wasm_internal.wasm, pose_heavy.N.bin
-                      MediaPipe runtime and the pose model, served next to the page
+                      own <html>/<head> skeleton and serve only web file types:
+                      loads the model as base64 text parts, pose_heavy.N.b64.txt
 
 The point of this script is the verification, not the packaging. web/posture.js
 is a hand port of posture/, and a hand port drifts silently: a sign error in
@@ -59,7 +59,9 @@ VISION_VERSION = "1.0.1"
 WASM_URL = (f"https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@{VISION_VERSION}"
             "/wasm/vision_wasm_internal.wasm")
 MODEL = os.path.join(ROOT, "models", "pose_landmarker_heavy.task")
-PART_BYTES = 14 * 1024 * 1024   # the artifact host takes binary files up to 15 MB
+PART_BYTES = 14 * 1024 * 1024   # raw parts, kept under common 15 MB per-file limits
+B64_PART_RAW = 3 * 3_495_253    # raw bytes per base64 part: a multiple of 3, so each
+                                # part decodes on its own; ~14 MB of text each
 
 # Home-page examples. All Pexels License. The first is also the hero figure.
 SAMPLES = [
@@ -250,24 +252,40 @@ def build_samples() -> list[dict]:
     return out
 
 
-def build_assets() -> dict:
+def build_assets() -> tuple[dict, dict]:
+    """Write the runtime and the model next to the page, in both encodings."""
     os.makedirs(DIST, exist_ok=True)
     wasm = os.path.join(DIST, "vision_wasm_internal.wasm")
     if not os.path.exists(wasm):
         print(f"fetching {WASM_URL}")
         with urllib.request.urlopen(WASM_URL, timeout=120) as r, open(wasm, "wb") as fh:
             fh.write(r.read())
-    for old in glob.glob(os.path.join(DIST, "pose_heavy.*.bin")):
+    for old in glob.glob(os.path.join(DIST, "pose_heavy.*")):
         os.remove(old)
     data = open(MODEL, "rb").read()
-    parts = []
+    wasm_bytes = os.path.getsize(wasm)
+
+    raw = []
     for i in range(0, len(data), PART_BYTES):
-        name = f"pose_heavy.{len(parts) + 1}.bin"
+        name = f"pose_heavy.{len(raw) + 1}.bin"
         with open(os.path.join(DIST, name), "wb") as fh:
             fh.write(data[i:i + PART_BYTES])
-        parts.append(name)
-    return {"wasm": os.path.basename(wasm), "model": parts,
-            "bytes": os.path.getsize(wasm) + len(data)}
+        raw.append(name)
+
+    b64, b64_bytes = [], 0
+    for i in range(0, len(data), B64_PART_RAW):
+        name = f"pose_heavy.{len(b64) + 1}.b64.txt"
+        enc = base64.b64encode(data[i:i + B64_PART_RAW])
+        with open(os.path.join(DIST, name), "wb") as fh:
+            fh.write(enc)
+        b64.append(name)
+        b64_bytes += len(enc)
+
+    binary = {"wasm": os.path.basename(wasm), "model": raw, "encoding": "binary",
+              "bytes": wasm_bytes + len(data)}
+    text = {"wasm": os.path.basename(wasm), "model": b64, "encoding": "base64",
+            "bytes": wasm_bytes + b64_bytes}
+    return binary, text
 
 
 def page(consts: dict, samples: list[dict]) -> str:
@@ -314,7 +332,7 @@ def main(argv=None) -> int:
               "landmark parity was only established for equal versions", file=sys.stderr)
         return 1
 
-    assets = build_assets()
+    assets, text_assets = build_assets()
     consts = constants(assets)
     if not args.skip_verify:
         print("verifying web/posture.js against posture/ on every test photo:")
@@ -324,14 +342,14 @@ def main(argv=None) -> int:
                   file=sys.stderr)
             return 1
     samples = build_samples()
-    body = page(consts, samples)
     with open(os.path.join(DIST, "artifact.html"), "w", encoding="utf-8") as fh:
-        fh.write(body)
+        fh.write(page({**consts, "assets": text_assets}, samples))
     with open(os.path.join(DIST, "index.html"), "w", encoding="utf-8") as fh:
-        fh.write(STANDALONE_HEAD + body + "\n</body>\n</html>\n")
+        fh.write(STANDALONE_HEAD + page(consts, samples) + "\n</body>\n</html>\n")
     kb = os.path.getsize(os.path.join(DIST, "index.html")) // 1024
     print(f"\nwritten web/dist/index.html ({kb} KB) + artifact.html; "
-          f"assets {assets['bytes'] / 1e6:.1f} MB in {1 + len(assets['model'])} files")
+          f"assets {assets['bytes'] / 1e6:.1f} MB binary / "
+          f"{text_assets['bytes'] / 1e6:.1f} MB with base64 model")
     return 0
 
 

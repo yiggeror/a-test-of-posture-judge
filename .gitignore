@@ -17,6 +17,7 @@ refset/
 candidates*.csv
 
 # web/dist binaries: the MediaPipe wasm (fetched by scripts/build_web.py from
-# jsdelivr) and the pose model split into parts (from models/). ~42 MB.
+# jsdelivr) and the pose model split into parts (from models/), raw and base64.
 web/dist/*.wasm
 web/dist/*.bin
+web/dist/*.b64.txt
